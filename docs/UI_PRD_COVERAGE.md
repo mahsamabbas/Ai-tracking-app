@@ -8,7 +8,7 @@ This tracks what the **web app** exposes today versus PRD v0.2. Backend gaps are
 |-----|-------------------|
 | FR-004 | `/my-activity`, `/policy` collection notice |
 | FR-005 | Coverage banners; pause messaging in policy & alerts |
-| FR-012 | `CapabilityBanner`, connector Tier labels |
+| FR-012 | `CapabilityBanner`, `ProviderTierBSummary`, connector Tier labels |
 | FR-019 | Coverage warnings on team table; alerts panel |
 | FR-020 | `TeamOverviewTable` — connector state, context, last event, hour count |
 | FR-021 | SSE indicator + 30s poll on overview |

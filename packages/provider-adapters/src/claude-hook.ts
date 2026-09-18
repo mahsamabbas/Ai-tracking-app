@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ActivityEvent } from "@techlio/event-schema";
 import { EventTypes, SCHEMA_VERSION } from "@techlio/event-schema";
+import { inferToolCategory } from "./tool-category.js";
 
 export interface ConnectorContext {
   organizationId: string;
@@ -52,7 +53,10 @@ export function claudeHookToEvents(
     consent_version: ctx.consentVersion,
     status: "succeeded",
     metadata: payload.tool_name
-      ? { tool_name: payload.tool_name, tool_category: "other" }
+      ? {
+          tool_name: payload.tool_name.slice(0, 128),
+          tool_category: inferToolCategory(payload.tool_name),
+        }
       : undefined,
   };
   return [event];

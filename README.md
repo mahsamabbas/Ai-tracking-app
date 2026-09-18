@@ -20,7 +20,7 @@ pnpm dev
 - **UI vs PRD coverage:** [docs/UI_PRD_COVERAGE.md](docs/UI_PRD_COVERAGE.md)
 - **API reference:** [docs/api.md](docs/api.md)
 
-That starts **API (3001), web (3000), and connector (9477)** in parallel. Optional hourly jobs: `pnpm dev:worker` in a second terminal (needs Redis).
+That starts **API (3001), web (3000), and connector (9477)** in parallel. Optional hourly jobs: `pnpm dev:worker` in a second terminal (needs Redis). Tier B provider pulls: `CURSOR_API_KEY` (Cursor daily + Analytics APIs), `GITHUB_TOKEN` + `GITHUB_ORG` (Copilot daily user report).
 
 **Do not** paste several `pnpm … dev` lines in one block with `# comments` on the same line — only the first command runs until you stop it.
 

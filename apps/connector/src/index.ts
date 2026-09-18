@@ -127,6 +127,7 @@ function enqueueHeartbeat(): void {
         provider_name: caps?.label,
         tier: caps?.tier,
         daily_only: caps ? !caps.hourly : true,
+        capabilities_missing: caps?.missing?.slice(0, 8).join(","),
       },
     }),
   ]);
@@ -218,6 +219,7 @@ app.post("/hooks/extension", async (req) => {
     EventTypes.lint_completed,
     EventTypes.task_context_changed,
     EventTypes.session_started,
+    EventTypes.session_ended,
   ]);
   if (!allowed.has(eventType)) {
     return { accepted: 0 };

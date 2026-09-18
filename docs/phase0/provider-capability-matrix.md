@@ -14,6 +14,16 @@ Phase 0 telemetry feasibility. Primary MVP connector target: **Claude Code**.
 | Heartbeat / connector health | Connector daemon | Connector daemon | Connector daemon | API poll lag | API poll lag |
 | Hourly summary support | Yes | Yes (after adapter) | Yes (after adapter) | No — show empty state | No — show empty state |
 
+## Ingested in this repo (Tier B puller + companion)
+
+| Source | Worker env | Stored as |
+|--------|------------|-----------|
+| Cursor `POST /teams/daily-usage-data` | `CURSOR_API_KEY` | `provider_daily_aggregate` (`daily_usage`: lines, completions, chat requests) |
+| Cursor Analytics `team/dau`, `team/agent-edits`, `by-user/agent-edits` | `CURSOR_API_KEY` (Enterprise) | `provider_daily_aggregate` with `aggregate_kind` |
+| GitHub Copilot users-1-day report | `GITHUB_TOKEN`, `GITHUB_ORG` | `provider_daily_aggregate` (`copilot_user_day`) |
+| IDE companion (Cursor/VS Code) | `pnpm dev` connector | session, file paths, task context, engineering tasks |
+| Claude Code hooks | `/hooks/claude` on connector | Tier A session/model/tool (when hooks configured) |
+
 ## Verification checklist
 
 - [ ] Techlio Cursor plan: Enterprise Admin API (`POST /teams/daily-usage-data`)

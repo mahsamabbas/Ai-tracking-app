@@ -100,4 +100,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-export function deactivate() {}
+export function deactivate() {
+  void postExtensionEvent({ event_type: "session_ended" });
+}

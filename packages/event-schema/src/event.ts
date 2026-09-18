@@ -38,6 +38,35 @@ export const MetadataSchema = z
     queue_depth: z.number().int().nonnegative().optional(),
     connector_paused: z.boolean().optional(),
     gap_reason: z.enum(["paused", "offline", "heartbeat_missing"]).optional(),
+    /** Tier B provider pull (Cursor Admin / Analytics, Copilot reports) */
+    aggregate_kind: z
+      .enum([
+        "daily_usage",
+        "team_dau",
+        "team_agent_edits",
+        "user_agent_edits",
+        "copilot_user_day",
+      ])
+      .optional(),
+    aggregate_day: z.string().max(32).optional(),
+    provider_user_id: z.string().max(64).optional(),
+    external_login: z.string().max(64).optional(),
+    lines_added: z.number().int().nonnegative().optional(),
+    lines_deleted: z.number().int().nonnegative().optional(),
+    completions_count: z.number().int().nonnegative().optional(),
+    chat_requests_count: z.number().int().nonnegative().optional(),
+    suggestions_count: z.number().int().nonnegative().optional(),
+    acceptances_count: z.number().int().nonnegative().optional(),
+    lines_suggested: z.number().int().nonnegative().optional(),
+    lines_accepted: z.number().int().nonnegative().optional(),
+    chat_turns: z.number().int().nonnegative().optional(),
+    chat_insertions: z.number().int().nonnegative().optional(),
+    dau: z.number().int().nonnegative().optional(),
+    cli_dau: z.number().int().nonnegative().optional(),
+    cloud_agent_dau: z.number().int().nonnegative().optional(),
+    total_accepts: z.number().int().nonnegative().optional(),
+    total_rejects: z.number().int().nonnegative().optional(),
+    capabilities_missing: z.string().max(256).optional(),
   })
   .strict();
 

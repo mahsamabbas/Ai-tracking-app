@@ -13,6 +13,16 @@ const CONNECTOR_TYPES = new Set([
 ]);
 
 export function formatEventContext(e: ActivityEventRow): string {
+  if (e.event_type === "provider_daily_aggregate" && e.metadata) {
+    const m = e.metadata;
+    const parts: string[] = [];
+    if (m.aggregate_kind) parts.push(String(m.aggregate_kind));
+    if (m.aggregate_day) parts.push(String(m.aggregate_day));
+    if (m.external_login) parts.push(String(m.external_login));
+    else if (m.provider_user_id) parts.push(`user ${m.provider_user_id}`);
+    return parts.join(" · ") || "Provider aggregate";
+  }
+
   if (e.project_id || e.work_item_id) {
     const parts: string[] = [];
     if (e.project_id) parts.push(`Project ${e.project_id.slice(0, 8)}…`);

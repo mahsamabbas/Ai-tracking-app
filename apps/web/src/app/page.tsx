@@ -16,6 +16,7 @@ import {
 import { EventsTable } from "@/components/EventsTable";
 import { ConnectorCards } from "@/components/ConnectorCards";
 import { CapabilityBanner } from "@/components/CapabilityBanner";
+import { ProviderTierBSummary } from "@/components/ProviderTierBSummary";
 import { AgentCollectionBanner } from "@/components/AgentCollectionBanner";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { TeamOverviewTable } from "@/components/TeamOverviewTable";
@@ -212,6 +213,7 @@ export default function HomePage() {
   return (
     <AppShell title={title} subtitle={subtitle}>
       <CapabilityBanner provider={primaryProvider} />
+      <ProviderTierBSummary events={events} />
       <AgentCollectionBanner
         provider={primaryProvider}
         heartbeatOnly={heartbeatOnly}

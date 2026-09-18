@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto";
 import type { ActivityEvent } from "@techlio/event-schema";
 import { EventTypes, SCHEMA_VERSION } from "@techlio/event-schema";
+import { deterministicEventId } from "./idempotency.js";
+import { cleanMetadata } from "./metadata.js";
 
 export interface CursorDailyRow {
   userId: number;
@@ -41,9 +42,11 @@ export function cursorRowToEvent(
     consentVersion: string;
   },
 ): ActivityEvent {
-  const occurredAt = new Date(`${row.day}T12:00:00.000Z`).toISOString();
+  const day = row.day.slice(0, 10);
+  const occurredAt = new Date(`${day}T12:00:00.000Z`).toISOString();
+  const seed = `cursor:daily_usage:${day}:${row.userId}:${ctx.organizationId}`;
   return {
-    event_id: randomUUID(),
+    event_id: deterministicEventId(seed),
     schema_version: SCHEMA_VERSION,
     organization_id: ctx.organizationId,
     developer_id: ctx.developerId,
@@ -53,11 +56,18 @@ export function cursorRowToEvent(
     event_type: EventTypes.provider_daily_aggregate,
     occurred_at: occurredAt,
     consent_version: ctx.consentVersion,
-    metadata: {
+    metadata: cleanMetadata({
       tier: "B",
       daily_only: true,
+      aggregate_kind: "daily_usage",
+      aggregate_day: day,
+      provider_user_id: String(row.userId),
+      lines_added: row.linesAdded,
+      lines_deleted: row.linesDeleted,
+      completions_count: row.completions,
+      chat_requests_count: row.chatRequests,
       token_input: row.completions,
       token_output: row.chatRequests,
-    },
+    }),
   };
 }
