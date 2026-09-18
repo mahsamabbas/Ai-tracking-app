@@ -42,7 +42,7 @@ export default function ConnectorsPage() {
         <p className="mt-1 text-xs text-slate-500">
           Device {DEVICE_ID.slice(0, 8)}…
         </p>
-        <pre className="mt-4 overflow-x-auto rounded-2xl bg-[#16141f] p-4 text-xs text-amber-100">
+        <pre className="mt-4 overflow-x-auto rounded-lg bg-ink-950 p-4 text-xs text-teal-100">
           {JSON.stringify(deviceHealth ?? { status: "unknown" }, null, 2)}
         </pre>
       </section>
@@ -51,7 +51,7 @@ export default function ConnectorsPage() {
         <h3 className="text-sm font-semibold">Local connector</h3>
         <p className="mt-2 text-sm text-slate-600">
           Runs at{" "}
-          <code className="rounded bg-[#f4f1ea] px-1">http://127.0.0.1:9477</code>
+          <code className="rounded bg-slate-100 px-1">http://127.0.0.1:9477</code>
           . Health:{" "}
           <a
             className="text-indigo-600 underline"

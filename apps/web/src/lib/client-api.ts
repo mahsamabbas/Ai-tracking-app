@@ -60,9 +60,42 @@ export async function createExport(
   format: "csv" | "pdf" = "csv",
   developerId = DEV_ID,
 ) {
-  const { json } = await apiFetch("/v1/activity-exports", token, {
+  const { ok, status, json } = await apiFetch("/v1/activity-exports", token, {
     method: "POST",
     body: JSON.stringify({ format, developerId }),
   });
-  return json;
+  if (!ok) {
+    const msg =
+      (json as { message?: string }).message ??
+      `Export failed (${status})`;
+    throw new Error(msg);
+  }
+  return json as { exportId?: string; downloadUrl?: string };
+}
+
+/** Downloads export with JWT — window.open cannot send Authorization. */
+export async function downloadActivityExport(
+  token: string | null,
+  exportId: string,
+  format: "csv" | "pdf",
+): Promise<void> {
+  if (!token) throw new Error("Sign in required");
+  const r = await fetch(`${API_BASE}/v1/activity-exports/${exportId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message ?? `Download failed (${r.status})`,
+    );
+  }
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `techlio-activity-${exportId.slice(0, 8)}.${format === "csv" ? "csv" : "txt"}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

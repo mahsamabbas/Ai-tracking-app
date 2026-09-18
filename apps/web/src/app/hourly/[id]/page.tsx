@@ -91,7 +91,7 @@ export default function HourlyDetailPage() {
             ) : null}
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {METRIC_ROWS.map(({ key, label }) => (
-                <div key={key} className="rounded-xl bg-[#f4f1ea] px-3 py-2">
+                <div key={key} className="rounded-lg bg-slate-50 px-3 py-2">
                   <p className="text-xs text-slate-500">{label}</p>
                   <p className="text-sm font-semibold text-slate-900">
                     {formatMetric(key, metrics[key])}

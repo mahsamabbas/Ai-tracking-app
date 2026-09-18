@@ -72,7 +72,7 @@ export default function DeveloperDayPage() {
       {cards.length > 0 && (
         <>
           <section className="mb-6 grid gap-4 sm:grid-cols-3">
-            <StatCard label="Hours captured" value={cards.length} accent="indigo" />
+            <StatCard label="Hours captured" value={cards.length} accent="teal" />
             <StatCard
               label="Latest version"
               value={cards[cards.length - 1]?.version ?? 1}
@@ -112,7 +112,7 @@ export default function DeveloperDayPage() {
           return (
             <article key={c.id ?? i} className="card">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-serif text-lg text-slate-900">
+                <h3 className="text-lg font-semibold text-ink-900">
                   {hourLabel
                     ? new Date(hourLabel as string).toLocaleString()
                     : `Hour ${i + 1}`}
@@ -139,7 +139,7 @@ export default function DeveloperDayPage() {
                 ].map(([label, ms]) => (
                   <div
                     key={label as string}
-                    className="rounded-xl bg-[#f4f1ea] px-3 py-2"
+                    className="rounded-lg bg-slate-50 px-3 py-2"
                   >
                     <p className="text-xs text-slate-500">{label as string}</p>
                     <p className="font-mono text-sm font-medium">

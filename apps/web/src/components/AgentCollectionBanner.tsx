@@ -16,7 +16,7 @@ export function AgentCollectionBanner({
   const label = providerLabel(provider);
 
   return (
-    <div className="mb-6 rounded-2xl border border-[#e6dfd2] bg-[#faf7f2] px-4 py-4 sm:px-5">
+    <div className="mb-6 rounded-xl border border-teal-200/60 bg-teal-50/50 px-4 py-4 sm:px-5">
       <p className="text-sm font-semibold text-slate-900">
         Connector sees {label} — no agent interactions in the feed yet
       </p>

@@ -31,42 +31,39 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-[#f4f1ea] lg:flex-row">
-      <section className="relative flex flex-1 flex-col justify-between overflow-hidden bg-[#16141f] p-8 text-slate-100 sm:p-12">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.18),transparent_42%),radial-gradient(circle_at_80%_80%,rgba(15,118,110,0.22),transparent_40%)]" />
+    <div className="flex min-h-[100dvh] flex-col bg-surface-canvas lg:flex-row">
+      <section className="relative flex flex-1 flex-col justify-between overflow-hidden bg-gradient-to-br from-ink-950 via-ink-900 to-ink-800 p-8 text-slate-100 sm:p-12">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(45,212,191,0.2),transparent_45%),radial-gradient(circle_at_85%_75%,rgba(56,189,248,0.12),transparent_40%)]" />
         <div className="relative">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-200/80">
-            Techlio
-          </p>
-          <h1 className="mt-5 max-w-md font-serif text-4xl leading-tight text-white sm:text-5xl">
-            Your portal. Your permissions.
+          <div className="flex items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent font-bold text-white">
+              T
+            </div>
+            <span className="text-sm font-semibold text-white">Techlio</span>
+          </div>
+          <h1 className="mt-8 max-w-md text-4xl font-bold leading-tight text-white sm:text-5xl">
+            See what the agent performed.
           </h1>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">
-            Sign in to see what the agent performed — sessions, model calls,
-            tools, tests, and coverage gaps. This is not timekeeping.
+            Personal portals for managers, developers, auditors, and admins —
+            JWT-secured, role-scoped, metadata only.
           </p>
         </div>
-        <ul className="relative mt-10 space-y-3 text-sm text-slate-300">
-          <li>Managers see the team</li>
-          <li>Developers see only their own signals</li>
-          <li>Auditors review access history</li>
-          <li>Admins run connectors</li>
+        <ul className="relative mt-10 space-y-2 text-sm text-slate-400">
+          <li>Teal signals for live activity</li>
+          <li>Coverage gaps, not silent zeros</li>
+          <li>No timesheet conclusions</li>
         </ul>
-        <p className="relative mt-8 text-xs text-slate-500">
-          JWT session · 12 hours · role encoded in the token
-        </p>
       </section>
 
-      <section className="flex w-full max-w-lg flex-col justify-center p-6 sm:p-10 lg:min-h-[100dvh]">
-        <h2 className="font-serif text-3xl text-slate-900">Welcome back</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Local accounts for the MVP. Production will use SSO.
-        </p>
+      <section className="flex w-full max-w-md flex-col justify-center p-6 sm:p-10 lg:min-h-[100dvh] lg:max-w-lg">
+        <h2 className="text-2xl font-bold text-ink-900">Sign in</h2>
+        <p className="mt-1 text-sm text-surface-muted">Local MVP accounts</p>
         <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-ink-800">
             Email
             <input
-              className="mt-1 min-h-[44px] w-full rounded-2xl border border-[#e6dfd2] bg-white px-3"
+              className="mt-1 min-h-[44px] w-full rounded-lg border border-surface-border bg-white px-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -74,10 +71,10 @@ export default function LoginPage() {
               required
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-ink-800">
             Password
             <input
-              className="mt-1 min-h-[44px] w-full rounded-2xl border border-[#e6dfd2] bg-white px-3"
+              className="mt-1 min-h-[44px] w-full rounded-lg border border-surface-border bg-white px-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -85,19 +82,13 @@ export default function LoginPage() {
               required
             />
           </label>
-          {error ? (
-            <p className="text-sm text-rose-600">{error}</p>
-          ) : null}
-          <button
-            type="submit"
-            disabled={busy}
-            className="min-h-[44px] w-full rounded-2xl bg-[#16141f] font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-          >
-            {busy ? "Signing in…" : "Continue to your portal"}
+          {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+          <button type="submit" disabled={busy} className="btn-primary w-full min-h-[44px]">
+            {busy ? "Signing in…" : "Continue"}
           </button>
         </form>
         <div className="mt-8">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
             Demo portals
           </p>
           <ul className="mt-3 space-y-2">
@@ -105,16 +96,16 @@ export default function LoginPage() {
               <li key={a.email}>
                 <button
                   type="button"
-                  className="w-full rounded-2xl border border-[#e6dfd2] bg-white px-3 py-2.5 text-left text-sm hover:bg-[#faf7f2]"
+                  className="w-full rounded-lg border border-surface-border bg-white px-3 py-2.5 text-left text-sm transition hover:border-accent/40 hover:shadow-sm"
                   onClick={() => {
                     setEmail(a.email);
                     setPassword(a.password);
                   }}
                 >
-                  <span className="font-medium text-slate-900">
+                  <span className="font-semibold text-ink-900">
                     {a.who} · {a.role}
                   </span>
-                  <span className="mt-0.5 block text-xs text-slate-500">
+                  <span className="mt-0.5 block text-xs text-surface-muted">
                     {a.email}
                   </span>
                 </button>

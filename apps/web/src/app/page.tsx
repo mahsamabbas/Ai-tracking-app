@@ -21,7 +21,11 @@ import { AlertsPanel } from "@/components/AlertsPanel";
 import { TeamOverviewTable } from "@/components/TeamOverviewTable";
 import { FilterBar, type DashboardFilters } from "@/components/FilterBar";
 import { API_BASE, DEV_ID, streamUrl } from "@/lib/api";
-import { createExport, fetchTeamDashboard } from "@/lib/client-api";
+import {
+  createExport,
+  downloadActivityExport,
+  fetchTeamDashboard,
+} from "@/lib/client-api";
 import type { TeamResponse, ActivityEventRow } from "@/lib/types";
 import {
   assignedVsUnassigned,
@@ -173,6 +177,28 @@ export default function HomePage() {
     ? "What the agent performed in your connected tools — the same metadata managers see"
     : `Near-live connector status and agent-visible activity for ${user?.displayName ?? "your org"}`;
 
+  async function runExport(format: "csv" | "pdf") {
+    if (!token) return;
+    try {
+      const result = await createExport(token, format);
+      const exportId =
+        result.exportId ??
+        result.downloadUrl?.replace(/^.*\//, "") ??
+        "";
+      if (!exportId) throw new Error("Export id missing from API");
+      await downloadActivityExport(token, exportId, format);
+    } catch (err) {
+      setBanner({
+        variant: "error",
+        title: "Export failed",
+        detail:
+          err instanceof Error
+            ? err.message
+            : "Check database migrations and sign-in role (manager/auditor/admin).",
+      });
+    }
+  }
+
   return (
     <AppShell title={title} subtitle={subtitle}>
       <CapabilityBanner provider={primaryProvider} />
@@ -186,16 +212,8 @@ export default function HomePage() {
           filters={filters}
           onChange={setFilters}
           liveAt={liveAt}
-          onExportCsv={() =>
-            void createExport(token, "csv").then((r) => {
-              if (r.downloadUrl) window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
-            })
-          }
-          onExportPdf={() =>
-            void createExport(token, "pdf").then((r) => {
-              if (r.downloadUrl) window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
-            })
-          }
+          onExportCsv={() => void runExport("csv")}
+          onExportPdf={() => void runExport("pdf")}
         />
       ) : (
         <p className="mb-4 text-xs text-slate-500">Refreshing every 30s</p>
@@ -218,7 +236,7 @@ export default function HomePage() {
               label="Agent-visible events"
               value={agentVisible}
               hint="Excludes connector heartbeats"
-              accent="indigo"
+              accent="teal"
             />
             <StatCard
               label="Connectors online"
@@ -301,14 +319,14 @@ export default function HomePage() {
           <section className="mb-6">
             {!isDeveloper ? (
               <div>
-                <h3 className="mb-3 font-serif text-lg text-slate-900">
+                <h3 className="mb-3 text-lg font-semibold text-ink-900">
                   Connectors
                 </h3>
                 <ConnectorCards connectors={connectors} />
               </div>
             ) : (
               <div className="card">
-                <h3 className="font-serif text-lg text-slate-900">
+                <h3 className="text-lg font-semibold text-ink-900">
                   Your collection
                 </h3>
                 <p className="mt-2 text-sm text-slate-600">

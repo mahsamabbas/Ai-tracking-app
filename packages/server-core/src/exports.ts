@@ -29,16 +29,39 @@ export async function createActivityExport(input: {
     .orderBy(desc(activityEvents.occurredAt))
     .limit(5000);
 
+  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+
   let content: string;
   if (input.format === "pdf") {
-    content = `Activity summary export\nEvents: ${rows.length}\n(Use CSV for structured data; PDF is a minimal stub.)`;
+    const lines = [
+      "Techlio activity summary (operational review — not timekeeping)",
+      `Generated: ${new Date().toISOString()}`,
+      `Event rows: ${rows.length}`,
+      "",
+      ...rows.slice(0, 200).map(
+        (r) =>
+          `${r.occurredAt.toISOString()}  ${r.eventType}  ${(r.payload as { provider?: string }).provider ?? ""}`,
+      ),
+    ];
+    if (rows.length > 200) {
+      lines.push("", `(Truncated — export CSV for full structured data.)`);
+    }
+    content = lines.join("\n");
   } else {
     const header =
       "event_id,event_type,occurred_at,developer_id,provider,session_id\n";
-    const lines = rows.map(
-      (r) =>
-        `${r.eventId},${r.eventType},${r.occurredAt.toISOString()},${r.developerId},${(r.payload as { provider?: string }).provider ?? ""},${r.sessionId ?? ""}`,
-    );
+    const lines = rows.map((r) => {
+      const provider =
+        (r.payload as { provider?: string }).provider ?? "";
+      return [
+        esc(r.eventId),
+        esc(r.eventType),
+        esc(r.occurredAt.toISOString()),
+        esc(r.developerId),
+        esc(provider),
+        esc(r.sessionId ?? ""),
+      ].join(",");
+    });
     content = header + lines.join("\n");
   }
 
@@ -53,13 +76,17 @@ export async function createActivityExport(input: {
     createdAt: new Date(),
   });
 
-  await db.insert(auditLog).values({
-    organizationId: input.organizationId,
-    actorId: input.requestedBy ?? null,
-    action: "activity.export",
-    detail: { exportId, format: input.format, rowCount: rows.length },
-    createdAt: new Date(),
-  });
+  try {
+    await db.insert(auditLog).values({
+      organizationId: input.organizationId,
+      actorId: input.requestedBy ?? null,
+      action: "activity.export",
+      detail: { exportId, format: input.format, rowCount: rows.length },
+      createdAt: new Date(),
+    });
+  } catch {
+    /* audit table optional in minimal dev DB */
+  }
 
   return {
     exportId,

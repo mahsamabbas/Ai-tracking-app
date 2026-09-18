@@ -15,7 +15,7 @@ export default function AuditPage() {
     >
       <div className="card overflow-hidden p-0">
         <table className="w-full text-left text-sm">
-          <thead className="bg-[#f4f1ea] text-xs uppercase text-slate-500">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th className="px-5 py-3">Action</th>
               <th className="px-5 py-3">Actor</th>

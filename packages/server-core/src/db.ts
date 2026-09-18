@@ -22,5 +22,16 @@ pool.query(`
     developer_id UUID
   )
 `).catch(() => {});
+pool.query(`
+  CREATE TABLE IF NOT EXISTS activity_exports (
+    id UUID PRIMARY KEY,
+    organization_id UUID NOT NULL,
+    requested_by UUID,
+    format TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ready',
+    content TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )
+`).catch(() => {});
 
 export const db = drizzle(pool, { schema });

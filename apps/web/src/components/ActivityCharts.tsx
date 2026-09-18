@@ -17,12 +17,12 @@ import {
 } from "recharts";
 
 const COLORS = [
-  "#16141f",
-  "#d97706",
-  "#0f766e",
-  "#4f46e5",
-  "#be185d",
+  "#0d9488",
   "#0ea5e9",
+  "#6366f1",
+  "#f59e0b",
+  "#ec4899",
+  "#14b8a6",
   "#64748b",
 ];
 
@@ -39,7 +39,7 @@ function ChartCard({
 }) {
   return (
     <div className={`chart-card ${tall ? "h-[300px]" : "h-[240px]"} min-w-0 sm:h-[280px]`}>
-      <h3 className="font-serif text-lg leading-tight text-slate-900">{title}</h3>
+      <h3 className="text-base font-semibold leading-tight text-ink-900">{title}</h3>
       <p className="text-xs text-slate-500">{subtitle}</p>
       <div className="h-[85%]">{children}</div>
     </div>
@@ -174,7 +174,7 @@ export function EventTypesChart({
             <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
             <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 10 }} />
             <Tooltip />
-            <Bar dataKey="count" fill="#16141f" radius={[0, 4, 4, 0]} name="Count" />
+            <Bar dataKey="count" fill="#0d9488" radius={[0, 4, 4, 0]} name="Count" />
           </BarChart>
         </ResponsiveContainer>
       )}

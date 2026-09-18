@@ -56,7 +56,9 @@ export class ExportsController {
       return;
     }
     const type =
-      file.format === "csv" ? "text/csv" : "application/pdf";
+      file.format === "csv"
+        ? "text/csv; charset=utf-8"
+        : "text/plain; charset=utf-8";
     reply
       .header("Content-Type", type)
       .header(
