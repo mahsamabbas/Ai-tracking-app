@@ -11,16 +11,63 @@ export type TeamPayload = {
   recentEvents: unknown[];
 };
 
+function normalizeTeamPayload(raw: unknown): TeamPayload | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  return {
+    connectors: Array.isArray(o.connectors) ? o.connectors : [],
+    recentEvents: Array.isArray(o.recentEvents) ? o.recentEvents : [],
+  };
+}
+
 export default function HomePage() {
   const [data, setData] = useState<TeamPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | undefined>();
 
   useEffect(() => {
     const load = () => {
       fetch(`${API}/v1/dashboard/team`, { headers: { "x-role": "manager" } })
-        .then((r) => r.json())
-        .then(setData)
-        .catch(() => setError("connector_offline"));
+        .then(async (r) => {
+          const json = await r.json();
+          if (!r.ok) {
+            setErrorDetail(
+              typeof json?.message === "string" ? json.message : undefined,
+            );
+            setError(r.status >= 500 ? "api_unavailable" : "connector_offline");
+            return;
+          }
+          const normalized = normalizeTeamPayload(json);
+          if (!normalized) {
+            setError("events_delayed");
+            setErrorDetail(undefined);
+            return;
+          }
+          if (
+            json &&
+            typeof json === "object" &&
+            (json as { dbAvailable?: boolean }).dbAvailable === false
+          ) {
+            setError("api_unavailable");
+            setErrorDetail(
+              (json as { hint?: string }).hint ??
+                "Database is not reachable.",
+            );
+            setData(normalized);
+            return;
+          }
+          setError(null);
+          setErrorDetail(undefined);
+          setData(normalized);
+        })
+        .catch(() => {
+          setError("api_unavailable");
+          setErrorDetail(
+            "Cannot reach the API at " +
+              API +
+              ". Run pnpm dev in the project folder.",
+          );
+        });
     };
     load();
     const id = setInterval(load, 30_000);
@@ -28,7 +75,7 @@ export default function HomePage() {
   }, []);
 
   if (error) {
-    return <EmptyState kind="connector_offline" />;
+    return <EmptyState kind={error} detail={errorDetail} />;
   }
 
   if (!data) {

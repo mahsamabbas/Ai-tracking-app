@@ -1,5 +1,12 @@
 import * as ed from "@noble/ed25519";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+
+/** Required for @noble/ed25519 in Node (no Web Crypto sha512 sync by default). */
+ed.etc.sha512Sync = (...messages: Uint8Array[]) => {
+  const h = createHash("sha512");
+  for (const msg of messages) h.update(msg);
+  return new Uint8Array(h.digest());
+};
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 

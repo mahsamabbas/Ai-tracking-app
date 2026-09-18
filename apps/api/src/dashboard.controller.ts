@@ -27,12 +27,21 @@ export class DashboardController {
   @Get("dashboard/team")
   async team(@Headers("x-role") roleHeader?: string) {
     const user = userFromHeader(roleHeader);
-    const health = await db
-      .select()
-      .from(connectorHealth)
-      .where(eq(connectorHealth.organizationId, user.organizationId));
-    const events = await listRecentEvents(user.organizationId, 20);
-    return { connectors: health, recentEvents: events };
+    try {
+      const health = await db
+        .select()
+        .from(connectorHealth)
+        .where(eq(connectorHealth.organizationId, user.organizationId));
+      const events = await listRecentEvents(user.organizationId, 20);
+      return { connectors: health, recentEvents: events, dbAvailable: true };
+    } catch {
+      return {
+        connectors: [],
+        recentEvents: [],
+        dbAvailable: false,
+        hint: "Start Docker and run: docker compose up -d postgres redis",
+      };
+    }
   }
 
   @Get("developers/:id/timeline")
