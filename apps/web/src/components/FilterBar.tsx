@@ -7,7 +7,8 @@ export type DashboardFilters = {
   eventType: string;
   provider: string;
   coverageOnly: boolean;
-  connectorState: "" | "online" | "stale" | "paused";
+  connectorState: "" | "online" | "stale" | "paused" | "offline";
+  developerId: string;
 };
 
 export function FilterBar({
@@ -16,12 +17,16 @@ export function FilterBar({
   onExportCsv,
   onExportPdf,
   liveAt,
+  developers,
+  showExport,
 }: {
   filters: DashboardFilters;
   onChange: (f: DashboardFilters) => void;
   onExportCsv: () => void;
   onExportPdf: () => void;
   liveAt: string | null;
+  developers?: { developerId: string; displayName: string }[];
+  showExport?: boolean;
 }) {
   const mounted = useMounted();
   const liveLabel =
@@ -39,7 +44,26 @@ export function FilterBar({
           <span className="text-xs text-emerald-700">{liveLabel}</span>
         ) : null}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {developers && developers.length > 0 ? (
+          <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+            Developer
+            <select
+              className="min-h-[40px] rounded-lg border border-slate-300 px-3 text-sm"
+              value={filters.developerId}
+              onChange={(e) =>
+                onChange({ ...filters, developerId: e.target.value })
+              }
+            >
+              <option value="">All developers</option>
+              {developers.map((d) => (
+                <option key={d.developerId} value={d.developerId}>
+                  {d.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
           Event type
           <input
@@ -85,6 +109,7 @@ export function FilterBar({
             <option value="">Any</option>
             <option value="online">Online</option>
             <option value="stale">Stale</option>
+            <option value="offline">Offline</option>
             <option value="paused">Paused</option>
           </select>
         </label>
@@ -100,6 +125,7 @@ export function FilterBar({
           Coverage warnings only
         </label>
       </div>
+      {showExport !== false ? (
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn-primary" onClick={onExportCsv}>
           Export CSV
@@ -108,6 +134,7 @@ export function FilterBar({
           Export summary (text)
         </button>
       </div>
+      ) : null}
       <p className="text-xs text-slate-400">
         Downloads use your signed-in session — not a new browser tab.
       </p>

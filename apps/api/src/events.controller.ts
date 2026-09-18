@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Headers,
+  HttpCode,
   Post,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -38,6 +39,7 @@ export class EventsController {
   }
 
   @Post("timesheet")
+  @HttpCode(404)
   rejectTimesheet() {
     return { error: "timesheet_import_not_supported", statusCode: 404 };
   }

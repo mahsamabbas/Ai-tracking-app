@@ -1,12 +1,32 @@
-import { Controller, Get, Req, Res } from "@nestjs/common";
+import { Controller, Get, Query, Req, Res, UnauthorizedException } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { listRecentEvents } from "./services/ingest.js";
+import { verifyUserToken } from "./auth/jwt.js";
 import { DEV_ORG } from "./constants.js";
 
 @Controller("v1/stream")
 export class StreamController {
   @Get("sse")
-  async sse(@Req() req: FastifyRequest, @Res() reply: FastifyReply) {
+  async sse(
+    @Req() req: FastifyRequest,
+    @Res() reply: FastifyReply,
+    @Query("access_token") accessToken?: string,
+  ) {
+    const header = req.headers.authorization;
+    const raw = header?.startsWith("Bearer ")
+      ? header.slice(7)
+      : accessToken;
+    let organizationId = DEV_ORG;
+    if (raw) {
+      try {
+        organizationId = verifyUserToken(raw).organizationId;
+      } catch {
+        throw new UnauthorizedException("invalid_token");
+      }
+    } else if (process.env.ALLOW_DEV_HEADER_AUTH === "0") {
+      throw new UnauthorizedException("token_required");
+    }
+
     reply.raw.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
@@ -15,7 +35,7 @@ export class StreamController {
 
     const send = async () => {
       try {
-        const events = await listRecentEvents(DEV_ORG, 10);
+        const events = await listRecentEvents(organizationId, 10);
         const payload = JSON.stringify({
           at: new Date().toISOString(),
           recentCount: events.length,

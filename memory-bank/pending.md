@@ -1,7 +1,7 @@
 # Pending work vs PRD v0.2
 
 Source: [requirements.md](requirements.md).  
-Last reviewed: 2026-09-18 (post engineering pass).
+Last reviewed: 2026-09-18 (portal isolation pass).
 
 ---
 
@@ -9,29 +9,38 @@ Last reviewed: 2026-09-18 (post engineering pass).
 
 | Item | Status |
 |------|--------|
-| Monitoring notice approved (SEC-007) | Draft only |
+| Monitoring notice approved (SEC-007) | Draft only (shown in Policy) |
 | Legal / HR (SEC-010) | Not done |
 | Section 21 open decisions | Partial — `docs/policy/open-decisions.md` |
 | Phase 0 live Claude validation | Not done |
 | 7-day pilot + report (§20) | Not done |
-| Definition of Done (§22) | Not met |
+| Definition of Done (§22) | Not met (legal + production ops) |
 
 ---
 
-## Functional requirements — remaining
+## Prototype portals (resolved this pass)
+
+| Role | Sees | Cannot see |
+|------|------|------------|
+| **Administrator** | Users, connector register/revoke, policy/retention, audit, team overview | Other organizations |
+| **Manager** | Team overview (all org developers), hourly timelines, filters, in-app alerts, CSV/PDF export | User admin, credential issue/revoke, audit log |
+| **Developer** | Own connector, own events, own hourly cards, pause/resume, collection notice | Other developers (e.g. Sam vs Alex), exports, audit, user admin |
+| **Auditor** | Live `audit_log`, connector health (read), policy/retention | Developer timelines, hourly drill-down, exports, mutations |
+
+---
+
+## Functional requirements — remaining (not prototype-local)
 
 | ID | Status |
 |----|--------|
-| FR-001 | **Partial** — JWT login + RBAC portals (SSO/OIDC still pending) |
-| FR-002 | **Partial** — guards on dashboard routes; not full Admin/Auditor UI |
-| FR-003 | **Partial** — org header stub; not full tenant isolation |
+| FR-001 | **Partial** — JWT portals; production SSO/OIDC still pending |
 | FR-006 | **Partial** — Claude hooks; Codex/Gemini OTLP adapters pending |
 | FR-007 | **Partial** — register/revoke + hash; API Ed25519 verify not enforced |
-| FR-024 | **Deferred** — LLM hourly narrative |
-| FR-027 | **Pending** — manager notifications delivery |
-| FR-028 | **Partial** — CSV + minimal PDF stub (not full report layout) |
+| FR-024 | **Deferred** — UI explains deterministic metrics only |
+| FR-027 | **Partial** — in-app health notifications; no email/Slack delivery |
+| FR-028 | **Partial** — CSV + text export (not full PDF layout) |
 
-Most other FRs have **local dev implementations** (pause/gaps, sessionization, drill-down, filters, SSE, exports, extension events). Verify against your DB after migration `002`.
+FR-002/003/004/005 are implemented for the local prototype (RBAC on routes, org-scoped queries, developer self-view, pause → coverage gap).
 
 ---
 
@@ -48,7 +57,7 @@ Most other FRs have **local dev implementations** (pause/gaps, sessionization, d
 
 ## Tests (§19) — remaining integration
 
-Automated: overlap, secrets, unassigned, provider-missing, timesheet reject, unauthorized developer view, secret scan.
+Automated: overlap, secrets, unassigned, provider-missing, timesheet reject, unauthorized developer view, auditor denied timeline, secret scan.
 
 Still need **live integration**: offline connector, long idle, late event E2E, heartbeat stop, pause E2E, replay against API, provider-missing full UI.
 

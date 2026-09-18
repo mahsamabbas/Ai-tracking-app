@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 const ACCOUNTS = [
   { role: "Manager portal", who: "Faisal", email: "manager@techlio.local", password: "manager123" },
   { role: "Developer portal", who: "Alex", email: "developer@techlio.local", password: "developer123" },
+  { role: "Developer portal", who: "Sam", email: "sam@techlio.local", password: "developer123" },
   { role: "Admin portal", who: "Mahsam", email: "admin@techlio.local", password: "admin123" },
   { role: "Auditor portal", who: "Priya", email: "auditor@techlio.local", password: "auditor123" },
 ];

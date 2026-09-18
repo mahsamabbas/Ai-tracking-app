@@ -36,6 +36,7 @@ export async function registerDevice(input: {
   organizationId: string;
   developerId: string;
   publicKey?: string;
+  actorId?: string;
 }): Promise<{ deviceId: string; token: string }> {
   const deviceId = randomUUID();
   const token = randomBytes(32).toString("base64url");
@@ -50,8 +51,9 @@ export async function registerDevice(input: {
   });
   await db.insert(auditLog).values({
     organizationId: input.organizationId,
+    actorId: input.actorId ?? null,
     action: "connector.register",
-    detail: { deviceId },
+    detail: { deviceId, developerId: input.developerId },
     createdAt: new Date(),
   });
   return { deviceId, token };
@@ -60,6 +62,7 @@ export async function registerDevice(input: {
 export async function revokeDevice(
   organizationId: string,
   deviceId: string,
+  actorId?: string,
 ): Promise<boolean> {
   const rows = await db
     .update(devices)
@@ -71,9 +74,28 @@ export async function revokeDevice(
   if (rows.length === 0) return false;
   await db.insert(auditLog).values({
     organizationId,
+    actorId: actorId ?? null,
     action: "connector.revoke",
     detail: { deviceId },
     createdAt: new Date(),
   });
   return true;
+}
+
+export async function listOrgDevices(organizationId: string) {
+  return db
+    .select()
+    .from(devices)
+    .where(eq(devices.organizationId, organizationId));
+}
+
+export async function getDevice(
+  organizationId: string,
+  deviceId: string,
+): Promise<(typeof devices.$inferSelect) | null> {
+  const rows = await db
+    .select()
+    .from(devices)
+    .where(and(eq(devices.id, deviceId), eq(devices.organizationId, organizationId)));
+  return rows[0] ?? null;
 }

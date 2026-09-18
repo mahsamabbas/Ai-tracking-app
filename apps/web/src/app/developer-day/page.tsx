@@ -6,7 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { AlertBanner } from "@/components/AlertBanner";
 import { StatCard } from "@/components/StatCard";
 import { API_BASE, DEV_ID } from "@/lib/api";
-import { fetchTimeline } from "@/lib/client-api";
+import { fetchOrgDevelopers, fetchTimeline } from "@/lib/client-api";
 import type { HourlySnapshot } from "@/lib/types";
 import { CapabilityBanner } from "@/components/CapabilityBanner";
 import { formatDuration } from "@/lib/analytics";
@@ -23,9 +23,23 @@ import {
 
 export default function DeveloperDayPage() {
   const { token, user } = useAuth();
-  const developerId = user?.developerId ?? DEV_ID;
+  const isSelfOnly = user?.role === "developer";
+  const [selectedId, setSelectedId] = useState(user?.developerId ?? DEV_ID);
+  const developerId = isSelfOnly ? user?.developerId ?? DEV_ID : selectedId;
+  const [people, setPeople] = useState<{ developerId: string; displayName: string }[]>(
+    [],
+  );
   const [cards, setCards] = useState<HourlySnapshot[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token || isSelfOnly) return;
+    void fetchOrgDevelopers(token).then(({ json }) => {
+      const rows = json.developers ?? [];
+      setPeople(rows);
+      if (!selectedId && rows[0]) setSelectedId(rows[0].developerId);
+    });
+  }, [token, isSelfOnly, selectedId]);
 
   useEffect(() => {
     if (!token) return;
@@ -56,6 +70,22 @@ export default function DeveloperDayPage() {
       title="Developer day"
       subtitle="One card per clock hour — five durations stay separate (PRD §11)"
     >
+      {!isSelfOnly && people.length > 0 ? (
+        <label className="mb-6 flex max-w-sm flex-col gap-1 text-xs font-medium text-slate-600">
+          Developer
+          <select
+            className="min-h-[40px] rounded-lg border border-slate-300 px-3 text-sm"
+            value={developerId}
+            onChange={(e) => setSelectedId(e.target.value)}
+          >
+            {people.map((p) => (
+              <option key={p.developerId} value={p.developerId}>
+                {p.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       {error ? (
         <AlertBanner variant="warning" title={error} />
       ) : cards.length === 0 ? (

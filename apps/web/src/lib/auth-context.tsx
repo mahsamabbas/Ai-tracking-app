@@ -11,6 +11,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { API_BASE } from "./api";
 import type { Role } from "./api";
+import { homePathForRole } from "./permissions";
 
 const TOKEN_KEY = "techlio-jwt";
 
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(json.message ?? "Sign-in failed");
       }
       applySession(json.token, json.user);
-      router.push("/");
+      router.push(json.homePath ?? "/");
     },
     [applySession, router],
   );
@@ -107,8 +108,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!ready) return;
     const isPublic = PUBLIC_PATHS.includes(pathname);
     if (!token && !isPublic) router.replace("/login");
-    if (token && isPublic) router.replace("/");
-  }, [ready, token, pathname, router]);
+    if (token && isPublic) router.replace(homePathForRole(user?.role));
+  }, [ready, token, pathname, router, user?.role]);
 
   const value = useMemo<AuthState>(
     () => ({

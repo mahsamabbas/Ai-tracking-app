@@ -40,6 +40,11 @@ import {
   toolCategories,
 } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
+import {
+  canExportActivity,
+  canViewActivityCharts,
+  canViewTeam,
+} from "@/lib/permissions";
 
 export default function HomePage() {
   const { token, user } = useAuth();
@@ -50,6 +55,7 @@ export default function HomePage() {
     provider: "",
     coverageOnly: false,
     connectorState: "",
+    developerId: "",
   });
   const [liveAt, setLiveAt] = useState<string | null>(null);
   const [banner, setBanner] = useState<{
@@ -59,10 +65,9 @@ export default function HomePage() {
   } | null>(null);
 
   const isDeveloper = user?.role === "developer";
-  const canExport =
-    user?.role === "manager" ||
-    user?.role === "administrator" ||
-    user?.role === "auditor";
+  const showTeam = canViewTeam(user?.role);
+  const showCharts = canViewActivityCharts(user?.role);
+  const canExport = canExportActivity(user?.role);
 
   useEffect(() => {
     if (!token) return;
@@ -73,7 +78,7 @@ export default function HomePage() {
           provider: filters.provider || undefined,
           developerId: isDeveloper
             ? user?.developerId ?? DEV_ID
-            : undefined,
+            : filters.developerId || undefined,
         });
         const team: TeamResponse = {
           connectors: Array.isArray(json.connectors) ? json.connectors : [],
@@ -123,10 +128,11 @@ export default function HomePage() {
     load();
     const id = setInterval(load, 30_000);
     return () => clearInterval(id);
-  }, [filters.eventType, filters.provider, token, isDeveloper, user?.developerId]);
+  }, [filters.eventType, filters.provider, filters.developerId, token, isDeveloper, user?.developerId]);
 
   useEffect(() => {
-    const es = new EventSource(streamUrl());
+    if (!token) return;
+    const es = new EventSource(streamUrl(token));
     es.onmessage = (ev) => {
       try {
         const parsed = JSON.parse(ev.data) as { at?: string };
@@ -136,7 +142,7 @@ export default function HomePage() {
       }
     };
     return () => es.close();
-  }, []);
+  }, [token]);
 
   const events = (data?.recentEvents ?? []) as ActivityEventRow[];
   const connectors = data?.connectors ?? [];
@@ -180,7 +186,11 @@ export default function HomePage() {
   async function runExport(format: "csv" | "pdf") {
     if (!token) return;
     try {
-      const result = await createExport(token, format);
+      const result = await createExport(
+        token,
+        format,
+        filters.developerId || undefined,
+      );
       const exportId =
         result.exportId ??
         result.downloadUrl?.replace(/^.*\//, "") ??
@@ -207,16 +217,25 @@ export default function HomePage() {
         heartbeatOnly={heartbeatOnly}
       />
 
-      {canExport ? (
+      {showTeam ? (
         <FilterBar
           filters={filters}
           onChange={setFilters}
           liveAt={liveAt}
           onExportCsv={() => void runExport("csv")}
           onExportPdf={() => void runExport("pdf")}
+          developers={
+            (data?.developers ?? [])
+              .filter((d) => d.developerId)
+              .map((d) => ({
+                developerId: d.developerId as string,
+                displayName: d.displayName ?? "Developer",
+              }))
+          }
+          showExport={canExport}
         />
       ) : (
-        <p className="mb-4 text-xs text-slate-500">Refreshing every 30s</p>
+        <p className="mb-4 text-xs text-slate-500">Refreshing every 30s · your data only</p>
       )}
 
       {banner ? (
@@ -260,7 +279,7 @@ export default function HomePage() {
             />
           </section>
 
-          {!isDeveloper ? (
+          {showTeam ? (
             <section className="mb-6 grid gap-4 lg:grid-cols-2">
               <TeamOverviewTable rows={developers} />
               <AlertsPanel alerts={data?.alerts ?? []} />
@@ -271,6 +290,8 @@ export default function HomePage() {
             </section>
           )}
 
+          {showCharts ? (
+            <>
           <section className="mb-6 grid gap-4 lg:grid-cols-3">
             <div className="min-w-0 lg:col-span-2">
               <HourlyInteractionChart data={hourlyInteractionSeries(events)} />
@@ -325,13 +346,14 @@ export default function HomePage() {
                 <ConnectorCards connectors={connectors} />
               </div>
             ) : (
-              <div className="card">
-                <h3 className="text-lg font-semibold text-ink-900">
-                  Your collection
+              <div>
+                <h3 className="mb-3 text-lg font-semibold text-ink-900">
+                  Your connector
                 </h3>
-                <p className="mt-2 text-sm text-slate-600">
-                  Pause from the IDE companion. Pauses show as coverage gaps,
-                  never as proof you were inactive.
+                <ConnectorCards connectors={connectors} />
+                <p className="mt-3 text-sm text-slate-600">
+                  Pause from My activity or the IDE companion. Pauses show as
+                  coverage gaps, never as proof you were inactive.
                 </p>
               </div>
             )}
@@ -340,6 +362,8 @@ export default function HomePage() {
           <section>
             <EventsTable events={events} />
           </section>
+            </>
+          ) : null}
         </>
       )}
     </AppShell>

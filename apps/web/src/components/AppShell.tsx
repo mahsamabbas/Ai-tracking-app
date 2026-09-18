@@ -6,11 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useMounted } from "@/lib/use-mounted";
 import type { Role } from "@/lib/api";
+import { portalScopeCopy } from "@/lib/permissions";
 
 const ALL_NAV = [
-  { href: "/", label: "Overview", desc: "Live team signals", roles: ["manager", "administrator", "auditor", "developer"] as Role[] },
+  { href: "/", label: "Overview", desc: "Live team signals", roles: ["manager", "administrator", "developer"] as Role[] },
   { href: "/developer-day", label: "Developer day", desc: "Hourly timeline", roles: ["manager", "administrator", "developer"] as Role[] },
   { href: "/my-activity", label: "My activity", desc: "Your own signals", roles: ["developer"] as Role[] },
+  { href: "/users", label: "Users", desc: "Org access", roles: ["administrator"] as Role[] },
   { href: "/connectors", label: "Connectors", desc: "Health & versions", roles: ["administrator", "manager", "auditor"] as Role[] },
   { href: "/policy", label: "Policy", desc: "Collection notice", roles: ["manager", "administrator", "auditor", "developer"] as Role[] },
   { href: "/audit", label: "Audit", desc: "Access history", roles: ["auditor", "administrator"] as Role[] },
@@ -125,6 +127,9 @@ export function AppShell({
           </h1>
           <p className="mt-2 text-xs text-slate-400">
             Agent visibility — not timekeeping
+          </p>
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+            {portalScopeCopy(user.role)}
           </p>
         </div>
         <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-3">

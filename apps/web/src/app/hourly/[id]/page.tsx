@@ -89,6 +89,12 @@ export default function HourlyDetailPage() {
                 Completeness: {data.snapshot.completeness}
               </p>
             ) : null}
+            <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              AI-generated hourly narrative (FR-024) is not enabled in this
+              prototype. Metrics below are deterministic and linked to source
+              events. Wording in any future narrative must use “the agent
+              performed,” not “the developer worked.”
+            </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {METRIC_ROWS.map(({ key, label }) => (
                 <div key={key} className="rounded-lg bg-slate-50 px-3 py-2">

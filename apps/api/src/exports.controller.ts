@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -10,10 +11,11 @@ import {
 } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import {
+  canExportActivity,
   createActivityExport,
   getActivityExport,
 } from "@techlio/server-core";
-import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
+import { DashboardAuthGuard, userFromRequest } from "./auth/guards.js";
 
 @Controller("v1/activity-exports")
 @UseGuards(DashboardAuthGuard)
@@ -30,7 +32,9 @@ export class ExportsController {
     },
   ) {
     const user = userFromRequest(req);
-    requireRoles(user, ["administrator", "manager", "auditor"]);
+    if (!canExportActivity(user)) {
+      throw new ForbiddenException("role_forbidden");
+    }
     const result = await createActivityExport({
       organizationId: user.organizationId,
       requestedBy: user.id,
@@ -49,7 +53,9 @@ export class ExportsController {
     @Res() reply: FastifyReply,
   ) {
     const user = userFromRequest(req);
-    requireRoles(user, ["administrator", "manager", "auditor"]);
+    if (!canExportActivity(user)) {
+      throw new ForbiddenException("role_forbidden");
+    }
     const file = await getActivityExport(user.organizationId, id);
     if (!file) {
       reply.status(404).send({ error: "not_found" });

@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -51,6 +52,6 @@ export class DashboardAuthGuard implements CanActivate {
 
 export function requireRoles(user: AuthUser, allowed: Role[]): void {
   if (!allowed.includes(user.role)) {
-    throw new UnauthorizedException("role_forbidden");
+    throw new ForbiddenException("role_forbidden");
   }
 }

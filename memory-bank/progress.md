@@ -1,6 +1,6 @@
 # Progress snapshot
 
-**Overall:** MVP **feature-complete for local dev** on engineering paths; **not** production Definition of Done (legal pilot, OIDC, full §19 E2E).
+**Overall:** MVP **feature-complete for local prototype** on engineering paths including **portal isolation**; **not** production Definition of Done (legal pilot, OIDC, full §19 E2E).
 
 **Gap list:** [pending.md](pending.md)
 
@@ -12,6 +12,7 @@
 - Hourly metrics: tokens, tests/builds/files, linked event ids
 - Retention job (worker, `RETENTION_DAYS`)
 - Web: filters, export CSV, SSE indicator, hourly drill-down, developer self-view
+- Role-scoped portals: admin users/credentials, developer self-only data, auditor audit log
 - Connector: pause/resume gap events, heartbeat queue depth, extension hook
 - VS Code extension: file save + task context + task completion signals
 - SQL `002_devices_projects_sessions.sql`, `docs/api.md`

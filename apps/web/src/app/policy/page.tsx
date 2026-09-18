@@ -1,7 +1,26 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { useAuth } from "@/lib/auth-context";
+import { fetchOrgPolicy } from "@/lib/client-api";
 
 export default function PolicyPage() {
+  const { token, user } = useAuth();
+  const [policy, setPolicy] = useState<{
+    timezone?: string;
+    retentionEventsDays?: number;
+    retentionSummariesDays?: number;
+    staleHeartbeatMinutes?: number;
+    monitoringNoticeStatus?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    void fetchOrgPolicy(token).then(({ json }) => setPolicy(json));
+  }, [token]);
+
   return (
     <AppShell
       title="Collection notice"
@@ -10,7 +29,8 @@ export default function PolicyPage() {
       <div className="prose prose-slate max-w-none space-y-6 text-sm text-slate-700">
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
           <strong>Draft.</strong> Legal and HR must approve before employee
-          deployment (SEC-010).
+          deployment (SEC-010). Status:{" "}
+          {policy?.monitoringNoticeStatus ?? "draft"}.
         </p>
 
         <section className="card">
@@ -50,25 +70,44 @@ export default function PolicyPage() {
             Pause and coverage gaps
           </h3>
           <p className="mt-2">
-            You may pause collection from the IDE companion. Pauses appear as
-            coverage gaps — the dashboard will not treat them as proof you were
-            inactive.
+            You may pause collection from the IDE companion or My activity.
+            Pauses appear as coverage gaps — the dashboard will not treat them
+            as proof you were inactive.
           </p>
         </section>
 
-        <p>
-          Full draft:{" "}
-          <code className="rounded bg-slate-100 px-1 text-xs">
-            docs/policy/monitoring-notice-draft.md
-          </code>
-        </p>
+        <section className="card">
+          <h3 className="text-base font-semibold text-slate-900">
+            Retention and access
+          </h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>
+              Detailed events: {policy?.retentionEventsDays ?? 90} days
+            </li>
+            <li>
+              Hourly summaries and audit: {policy?.retentionSummariesDays ?? 365}{" "}
+              days
+            </li>
+            <li>Reporting timezone: {policy?.timezone ?? "UTC"}</li>
+            <li>
+              Stale heartbeat: {policy?.staleHeartbeatMinutes ?? 5} minutes
+            </li>
+            <li>
+              Managers see authorized team metadata. Developers see the same
+              records collected about themselves. Auditors see access history
+              and configuration, not timelines.
+            </li>
+          </ul>
+        </section>
 
-        <Link
-          href="/my-activity"
-          className="inline-flex min-h-[44px] items-center text-indigo-600 hover:underline"
-        >
-          View my activity →
-        </Link>
+        {user?.role === "developer" ? (
+          <Link
+            href="/my-activity"
+            className="inline-flex min-h-[44px] items-center text-indigo-600 hover:underline"
+          >
+            View my activity →
+          </Link>
+        ) : null}
       </div>
     </AppShell>
   );

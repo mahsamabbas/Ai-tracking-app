@@ -7,8 +7,10 @@ export type { Role };
 export const DEV_ID = "550e8400-e29b-41d4-a716-446655440011";
 export const DEVICE_ID = "550e8400-e29b-41d4-a716-446655440012";
 
-export function streamUrl(): string {
-  return `${API_BASE}/v1/stream/sse`;
+export function streamUrl(token: string | null): string {
+  const base = `${API_BASE}/v1/stream/sse`;
+  if (!token) return base;
+  return `${base}?access_token=${encodeURIComponent(token)}`;
 }
 
 export async function apiFetch(
@@ -42,6 +44,64 @@ export async function fetchTeamDashboard(
   return apiFetch(`/v1/dashboard/team${qs ? `?${qs}` : ""}`, token);
 }
 
+export async function fetchOrgDevelopers(token: string | null) {
+  return apiFetch("/v1/org/developers", token);
+}
+
+export async function fetchUsers(token: string | null) {
+  return apiFetch("/v1/users", token);
+}
+
+export async function createPortalUser(
+  token: string | null,
+  body: {
+    email: string;
+    password: string;
+    displayName: string;
+    role: Role;
+    developerId?: string;
+  },
+) {
+  return apiFetch("/v1/users", token, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchAuditLog(token: string | null) {
+  return apiFetch("/v1/audit-log", token);
+}
+
+export async function fetchOrgPolicy(token: string | null) {
+  return apiFetch("/v1/org/policy", token);
+}
+
+export async function pauseConnector(token: string | null, deviceId: string) {
+  return apiFetch(`/v1/connectors/${deviceId}/pause`, token, { method: "POST" });
+}
+
+export async function resumeConnector(token: string | null, deviceId: string) {
+  return apiFetch(`/v1/connectors/${deviceId}/resume`, token, {
+    method: "POST",
+  });
+}
+
+export async function registerConnector(
+  token: string | null,
+  developerId: string,
+) {
+  return apiFetch("/v1/connectors/register", token, {
+    method: "POST",
+    body: JSON.stringify({ developerId }),
+  });
+}
+
+export async function revokeConnector(token: string | null, deviceId: string) {
+  return apiFetch(`/v1/connectors/${deviceId}/revoke`, token, {
+    method: "POST",
+  });
+}
+
 export async function fetchTimeline(token: string | null, developerId: string) {
   const { json } = await apiFetch(
     `/v1/developers/${developerId}/timeline`,
@@ -58,7 +118,7 @@ export async function fetchHourlySnapshot(token: string | null, id: string) {
 export async function createExport(
   token: string | null,
   format: "csv" | "pdf" = "csv",
-  developerId = DEV_ID,
+  developerId?: string,
 ) {
   const { ok, status, json } = await apiFetch("/v1/activity-exports", token, {
     method: "POST",

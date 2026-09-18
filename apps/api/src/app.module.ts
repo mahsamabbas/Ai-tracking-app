@@ -7,10 +7,12 @@ import { SessionsController } from "./sessions.controller.js";
 import { ExportsController } from "./exports.controller.js";
 import { StreamController } from "./stream.controller.js";
 import { AuthController } from "./auth/auth.controller.js";
+import { OrgController } from "./org.controller.js";
 
 @Module({
   controllers: [
     AuthController,
+    OrgController,
     EventsController,
     DashboardController,
     ConnectorsController,

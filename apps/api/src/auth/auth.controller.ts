@@ -18,7 +18,10 @@ export class AuthController {
     const password = body.password ?? "";
     const user = await authenticatePortalUser(email, password);
     if (!user) throw new UnauthorizedException("invalid_credentials");
-    const token = signUserToken(user);
+    const token = signUserToken({
+      ...user,
+      developerId: user.developerId ?? undefined,
+    });
     return {
       token,
       user: {
@@ -29,6 +32,14 @@ export class AuthController {
         organizationId: user.organizationId,
         developerId: user.developerId ?? null,
       },
+      homePath:
+        user.role === "developer"
+          ? "/my-activity"
+          : user.role === "auditor"
+            ? "/audit"
+            : user.role === "administrator"
+              ? "/users"
+              : "/",
     };
   }
 

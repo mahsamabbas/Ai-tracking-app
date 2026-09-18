@@ -1,8 +1,12 @@
-import { eq } from "drizzle-orm";
-import { createHash } from "node:crypto";
+import { desc, eq } from "drizzle-orm";
+import { createHash, randomUUID } from "node:crypto";
 import { db } from "./db.js";
 import { portalUsers, auditLog } from "./schema.js";
 import type { Role } from "./roles.js";
+
+export const DEV_ORG = "550e8400-e29b-41d4-a716-446655440010";
+export const DEV_DEVELOPER_ALEX = "550e8400-e29b-41d4-a716-446655440011";
+export const DEV_DEVELOPER_SAM = "550e8400-e29b-41d4-a716-446655440021";
 
 export const DEMO_USERS: {
   email: string;
@@ -25,7 +29,15 @@ export const DEMO_USERS: {
     password: "developer123",
     displayName: "Alex",
     role: "developer",
-    developerId: "550e8400-e29b-41d4-a716-446655440011",
+    developerId: DEV_DEVELOPER_ALEX,
+  },
+  {
+    id: "880e8400-e29b-41d4-a716-446655440005",
+    email: "sam@techlio.local",
+    password: "developer123",
+    displayName: "Sam",
+    role: "developer",
+    developerId: DEV_DEVELOPER_SAM,
   },
   {
     id: "880e8400-e29b-41d4-a716-446655440003",
@@ -43,11 +55,18 @@ export const DEMO_USERS: {
   },
 ];
 
-export const DEV_ORG = "550e8400-e29b-41d4-a716-446655440010";
-
 function hashPassword(password: string): string {
   return createHash("sha256").update(`techlio:${password}`).digest("hex");
 }
+
+export type PortalUserPublic = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: Role;
+  organizationId: string;
+  developerId: string | null;
+};
 
 export async function seedPortalUsers(): Promise<void> {
   try {
@@ -73,14 +92,7 @@ export async function seedPortalUsers(): Promise<void> {
 export async function authenticatePortalUser(
   email: string,
   password: string,
-): Promise<{
-  id: string;
-  email: string;
-  displayName: string;
-  role: Role;
-  organizationId: string;
-  developerId?: string;
-} | null> {
+): Promise<PortalUserPublic | null> {
   const hash = hashPassword(password);
   const rows = await db
     .select()
@@ -95,14 +107,7 @@ export async function authenticatePortalUser(
       detail: { email: row.email, role: row.role },
       createdAt: new Date(),
     });
-    return {
-      id: row.id,
-      email: row.email,
-      displayName: row.displayName,
-      role: row.role as Role,
-      organizationId: row.organizationId,
-      developerId: row.developerId ?? undefined,
-    };
+    return toPublic(row);
   }
 
   const demo = DEMO_USERS.find((u) => u.email === email.toLowerCase().trim());
@@ -113,8 +118,105 @@ export async function authenticatePortalUser(
       displayName: demo.displayName,
       role: demo.role,
       organizationId: DEV_ORG,
-      developerId: demo.developerId,
+      developerId: demo.developerId ?? null,
     };
   }
   return null;
+}
+
+function toPublic(row: typeof portalUsers.$inferSelect): PortalUserPublic {
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.displayName,
+    role: row.role as Role,
+    organizationId: row.organizationId,
+    developerId: row.developerId ?? null,
+  };
+}
+
+export async function listPortalUsers(
+  organizationId: string,
+): Promise<PortalUserPublic[]> {
+  const rows = await db
+    .select()
+    .from(portalUsers)
+    .where(eq(portalUsers.organizationId, organizationId));
+  return rows.map(toPublic);
+}
+
+export async function createPortalUser(input: {
+  organizationId: string;
+  actorId: string;
+  email: string;
+  password: string;
+  displayName: string;
+  role: Role;
+  developerId?: string | null;
+}): Promise<PortalUserPublic> {
+  const allowed: Role[] = ["administrator", "manager", "developer", "auditor"];
+  if (!allowed.includes(input.role)) {
+    throw new Error("invalid_role");
+  }
+  const id = randomUUID();
+  const email = input.email.toLowerCase().trim();
+  const developerId =
+    input.role === "developer"
+      ? (input.developerId ?? randomUUID())
+      : null;
+  await db.insert(portalUsers).values({
+    id,
+    organizationId: input.organizationId,
+    email,
+    passwordHash: hashPassword(input.password),
+    displayName: input.displayName.trim(),
+    role: input.role,
+    developerId,
+  });
+  await db.insert(auditLog).values({
+    organizationId: input.organizationId,
+    actorId: input.actorId,
+    action: "users.create",
+    detail: { email, role: input.role },
+    createdAt: new Date(),
+  });
+  return {
+    id,
+    email,
+    displayName: input.displayName.trim(),
+    role: input.role,
+    organizationId: input.organizationId,
+    developerId,
+  };
+}
+
+export async function listAuditLog(
+  organizationId: string,
+  limit = 100,
+): Promise<(typeof auditLog.$inferSelect)[]> {
+  return db
+    .select()
+    .from(auditLog)
+    .where(eq(auditLog.organizationId, organizationId))
+    .orderBy(desc(auditLog.createdAt))
+    .limit(limit);
+}
+
+export function getOrgPolicy() {
+  const retentionEventsDays = Number(process.env.RETENTION_DAYS ?? 90);
+  return {
+    timezone: process.env.ORG_TIMEZONE ?? "UTC",
+    retentionEventsDays,
+    retentionSummariesDays: 365,
+    staleHeartbeatMinutes: 5,
+    idleThresholdMinutes: 10,
+    monitoringNoticeStatus: "draft" as const,
+    notificationRules: [
+      "stale_connector",
+      "upload_failed",
+      "unsupported_version",
+      "unassigned_session",
+      "summary_failed",
+    ],
+  };
 }

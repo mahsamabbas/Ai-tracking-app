@@ -5,6 +5,7 @@ import { providerLabel } from "@/lib/providers";
 function stateBadge(state?: string) {
   if (state === "online") return <span className="badge-ok">Online</span>;
   if (state === "paused") return <span className="badge-warn">Paused</span>;
+  if (state === "offline") return <span className="badge-error">Offline</span>;
   return <span className="badge-error">Stale</span>;
 }
 
@@ -34,10 +35,11 @@ export function TeamOverviewTable({
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-semibold text-slate-900">
-                  {providerLabel(d.provider ?? undefined)}
+                  {d.displayName ?? providerLabel(d.provider ?? undefined)}
                 </p>
                 <p className="font-mono text-xs text-slate-500">
-                  {d.deviceId?.slice(0, 14)}…
+                  {providerLabel(d.provider ?? undefined)} ·{" "}
+                  {d.deviceId?.slice(0, 10) ?? "no device"}…
                 </p>
               </div>
               {stateBadge(d.connectorState)}
@@ -85,6 +87,7 @@ export function TeamOverviewTable({
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
+                <th className="px-4 py-3">Developer</th>
                 <th className="px-4 py-3">Provider</th>
                 <th className="px-4 py-3">Connector</th>
                 <th className="px-4 py-3">Context</th>
@@ -96,7 +99,10 @@ export function TeamOverviewTable({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((d) => (
-                <tr key={d.deviceId} className="hover:bg-slate-50/80">
+                <tr key={d.deviceId ?? d.developerId} className="hover:bg-slate-50/80">
+                  <td className="px-4 py-3 font-medium">
+                    {d.displayName ?? "Developer"}
+                  </td>
                   <td className="px-4 py-3 font-medium">
                     {providerLabel(d.provider ?? undefined)}
                   </td>

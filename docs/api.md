@@ -13,10 +13,16 @@ Base URL: `http://localhost:3001` (dev).
 |--------|------|--------|
 | POST | `/v1/auth/login` | `{ email, password }` → JWT + user |
 | GET | `/v1/auth/me` | Bearer JWT → current user |
-| POST | `/v1/connectors/register` | Returns `{ deviceId, token }` |
+| POST | `/v1/connectors/register` | Admin (any developer) or developer (self). Returns `{ deviceId, token }` |
 | POST | `/v1/connectors/:id/revoke` | Admin only |
-| POST | `/v1/connectors/:id/heartbeat` | Bearer token |
-| POST | `/v1/connectors/:id/pause` | Creates coverage gap event |
+| POST | `/v1/connectors/:id/heartbeat` | Bearer device token |
+| POST | `/v1/connectors/:id/pause` | Developer (own) or admin; coverage gap |
+| POST | `/v1/connectors/:id/resume` | Developer (own) or admin |
+| GET | `/v1/users` | Admin only |
+| POST | `/v1/users` | Admin only — create portal user |
+| GET | `/v1/org/developers` | Role-scoped developer list |
+| GET | `/v1/org/policy` | Retention and stale-heartbeat settings |
+| GET | `/v1/audit-log` | Auditor and admin |
 | POST | `/v1/events/batch` | Signed batch; idempotent by `event_id` |
 | GET | `/v1/projects` | Org-scoped project list |
 | GET | `/v1/work-items` | Optional `q`, `projectId` |

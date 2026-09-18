@@ -22,10 +22,12 @@ export type ConnectorRow = {
   queue_depth?: number;
   paused?: number;
   provider?: string;
+  developerId?: string;
 };
 
 export type DeveloperOverviewRow = {
   developerId?: string;
+  displayName?: string;
   deviceId?: string;
   provider?: string | null;
   connectorVersion?: string | null;
@@ -35,7 +37,7 @@ export type DeveloperOverviewRow = {
   queueDepth?: number | null;
   paused?: boolean;
   coverageWarning?: boolean;
-  connectorState?: "online" | "stale" | "paused";
+  connectorState?: "online" | "stale" | "paused" | "offline";
   currentSession?: {
     sessionId?: string;
     startedAt?: string;

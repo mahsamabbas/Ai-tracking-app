@@ -58,6 +58,32 @@ describe("Section 19 required scenarios", () => {
     expect(ok).toBe(false);
   });
 
+  it("auditor cannot open another developer timeline", () => {
+    expect(
+      canViewDeveloper(
+        {
+          id: "a1",
+          organizationId: "550e8400-e29b-41d4-a716-446655440010",
+          role: "auditor",
+        },
+        "550e8400-e29b-41d4-a716-446655440011",
+      ),
+    ).toBe(false);
+  });
+
+  it("manager can view team developer activity", () => {
+    expect(
+      canViewDeveloper(
+        {
+          id: "m1",
+          organizationId: "550e8400-e29b-41d4-a716-446655440010",
+          role: "manager",
+        },
+        "550e8400-e29b-41d4-a716-446655440011",
+      ),
+    ).toBe(true);
+  });
+
   it("replayed event id rejected by server-core secret scan", () => {
     expect(scanEventForSecrets({ metadata: { tool_name: "safe" } })).toBeNull();
     expect(
