@@ -10,28 +10,28 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { API_BASE } from "./api";
-import type { Role } from "./api";
 import { homePathForRole } from "./permissions";
+import type { Role } from "./types";
 
 const TOKEN_KEY = "techlio-jwt";
+const PUBLIC_PATHS = ["/login"];
 
-export type PortalUser = {
+export interface PortalUser {
   id: string;
   email: string;
   displayName: string;
   role: Role;
   organizationId: string;
   developerId?: string | null;
-};
+}
 
-type AuthState = {
+interface AuthState {
   token: string | null;
   user: PortalUser | null;
   ready: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  authHeaders: () => HeadersInit;
-};
+}
 
 const AuthContext = createContext<AuthState>({
   token: null,
@@ -39,10 +39,7 @@ const AuthContext = createContext<AuthState>({
   ready: false,
   login: async () => {},
   logout: () => {},
-  authHeaders: () => ({}),
 });
-
-const PUBLIC_PATHS = ["/login"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
@@ -51,16 +48,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const applySession = useCallback((nextToken: string, nextUser: PortalUser) => {
-    setToken(nextToken);
-    setUser(nextUser);
-    localStorage.setItem(TOKEN_KEY, nextToken);
-  }, []);
-
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem(TOKEN_KEY);
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* private mode */
+    }
     router.push("/login");
   }, [router]);
 
@@ -71,18 +66,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const json = await r.json();
-      if (!r.ok) {
-        throw new Error(json.message ?? "Sign-in failed");
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(json.message ?? "Sign-in failed");
+      setToken(json.token);
+      setUser(json.user);
+      try {
+        localStorage.setItem(TOKEN_KEY, json.token);
+      } catch {
+        /* private mode */
       }
-      applySession(json.token, json.user);
-      router.push(json.homePath ?? "/");
+      router.push(homePathForRole(json.user.role, json.user.developerId));
     },
-    [applySession, router],
+    [router],
   );
 
   useEffect(() => {
-    const stored = localStorage.getItem(TOKEN_KEY);
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(TOKEN_KEY);
+    } catch {
+      stored = null;
+    }
     if (!stored) {
       setReady(true);
       return;
@@ -97,9 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(json.user);
       })
       .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        setToken(null);
-        setUser(null);
+        try {
+          localStorage.removeItem(TOKEN_KEY);
+        } catch {
+          /* ignore */
+        }
       })
       .finally(() => setReady(true));
   }, []);
@@ -108,24 +114,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!ready) return;
     const isPublic = PUBLIC_PATHS.includes(pathname);
     if (!token && !isPublic) router.replace("/login");
-    if (token && isPublic) router.replace(homePathForRole(user?.role));
-  }, [ready, token, pathname, router, user?.role]);
+    if (token && isPublic) {
+      router.replace(homePathForRole(user?.role, user?.developerId));
+    }
+  }, [ready, token, pathname, router, user?.role, user?.developerId]);
 
   const value = useMemo<AuthState>(
-    () => ({
-      token,
-      user,
-      ready,
-      login,
-      logout,
-      authHeaders: () => {
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-        if (token) headers.Authorization = `Bearer ${token}`;
-        return headers;
-      },
-    }),
+    () => ({ token, user, ready, login, logout }),
     [token, user, ready, login, logout],
   );
 
@@ -134,8 +129,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   return useContext(AuthContext);
-}
-
-export function useRole(): Role {
-  return useContext(AuthContext).user?.role ?? "manager";
 }

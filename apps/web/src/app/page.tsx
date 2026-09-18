@@ -1,370 +1,508 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { AlertBanner } from "@/components/AlertBanner";
-import { StatCard } from "@/components/StatCard";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { StatTile } from "@/components/ui/StatTile";
+import { Callout } from "@/components/ui/Callout";
 import {
-  DonutChart,
-  EngineeringChecksChart,
-  EventTypesChart,
-  EventsTimelineChart,
-  HourlyInteractionChart,
-  InteractionMixChart,
-  ProviderPieChart,
-} from "@/components/ActivityCharts";
-import { EventsTable } from "@/components/EventsTable";
-import { ConnectorCards } from "@/components/ConnectorCards";
-import { CapabilityBanner } from "@/components/CapabilityBanner";
-import { ProviderTierBSummary } from "@/components/ProviderTierBSummary";
-import { AgentCollectionBanner } from "@/components/AgentCollectionBanner";
-import { AlertsPanel } from "@/components/AlertsPanel";
-import { TeamOverviewTable } from "@/components/TeamOverviewTable";
-import { FilterBar, type DashboardFilters } from "@/components/FilterBar";
-import { API_BASE, DEV_ID, streamUrl } from "@/lib/api";
+  ChartSkeleton,
+  EmptyState,
+  ErrorState,
+  StatSkeleton,
+} from "@/components/ui/States";
+import { TrendChart } from "@/components/charts/TrendChart";
+import { HourPatternChart } from "@/components/charts/HourPatternChart";
+import { DonutChart } from "@/components/charts/DonutChart";
+import { BarList } from "@/components/charts/BarList";
+import { AlertList } from "@/components/domain/AlertList";
+import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
+import { DurationSplit } from "@/components/domain/DurationSplit";
+import { FilterBar, SelectFilter } from "@/components/filters/FilterBar";
 import {
-  createExport,
-  downloadActivityExport,
-  fetchTeamDashboard,
-} from "@/lib/client-api";
-import type { TeamResponse, ActivityEventRow } from "@/lib/types";
-import {
-  assignedVsUnassigned,
-  coverageVsActivity,
-  engineeringOutcomes,
-  eventsByHour,
-  eventsByType,
-  hourlyInteractionSeries,
-  interactionBuckets,
-  outcomesSplit,
-  providerSplit,
-  toolCategories,
-} from "@/lib/analytics";
+  RangePicker,
+  rangeLabel,
+  rangeParams,
+  type RangeValue,
+} from "@/components/filters/RangePicker";
+import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
-import {
-  canExportActivity,
-  canViewActivityCharts,
-  canViewTeam,
-} from "@/lib/permissions";
+import { qs } from "@/lib/api";
+import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
+import { providerLabel } from "@/lib/providers";
+import { classificationOf, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
+import { canViewTeam } from "@/lib/permissions";
+import type {
+  FilterMeta,
+  LiveStatus,
+  OrganizationAnalytics,
+} from "@/lib/types";
 
-export default function HomePage() {
-  const { token, user } = useAuth();
-  const [data, setData] = useState<TeamResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<DashboardFilters>({
-    eventType: "",
-    provider: "",
-    coverageOnly: false,
-    connectorState: "",
-    developerId: "",
-  });
-  const [liveAt, setLiveAt] = useState<string | null>(null);
-  const [banner, setBanner] = useState<{
-    variant: "error" | "warning" | "info";
-    title: string;
-    detail?: string;
-  } | null>(null);
+export default function OverviewPage() {
+  const { user } = useAuth();
+  const [range, setRange] = useState<RangeValue>({ preset: "7d" });
+  const [team, setTeam] = useState("");
+  const [provider, setProvider] = useState("");
 
-  const isDeveloper = user?.role === "developer";
-  const showTeam = canViewTeam(user?.role);
-  const showCharts = canViewActivityCharts(user?.role);
-  const canExport = canExportActivity(user?.role);
+  const isSelfScope = user?.role === "developer";
+  const params = { ...rangeParams(range), team: team || undefined, provider: provider || undefined };
 
-  useEffect(() => {
-    if (!token) return;
-    const load = async () => {
-      try {
-        const { ok, status, json } = await fetchTeamDashboard(token, {
-          eventType: filters.eventType || undefined,
-          provider: filters.provider || undefined,
-          developerId: isDeveloper
-            ? user?.developerId ?? DEV_ID
-            : filters.developerId || undefined,
-        });
-        const team: TeamResponse = {
-          connectors: Array.isArray(json.connectors) ? json.connectors : [],
-          developers: Array.isArray(json.developers) ? json.developers : [],
-          alerts: Array.isArray(json.alerts) ? json.alerts : [],
-          recentEvents: Array.isArray(json.recentEvents)
-            ? json.recentEvents
-            : [],
-          dbAvailable: json.dbAvailable,
-          hint: json.hint,
+  const analytics = useApi<OrganizationAnalytics>(
+    `/v1/analytics/organization${qs(params)}`,
+  );
+  const live = useApi<LiveStatus>("/v1/dashboard/live?limit=8", { pollMs: 30_000 });
+  const meta = useApi<FilterMeta>("/v1/meta/filters");
+
+  const d = analytics.data;
+  const t = d?.totals;
+  const prev = d?.previousTotals;
+
+  const toolItems = useMemo(
+    () =>
+      (d?.tools ?? []).map((tool) => ({
+        label: providerLabel(tool.provider),
+        value: tool.activeMs,
+        formatted: formatDuration(tool.activeMs),
+        meta: `${tool.sessions} sessions · ${tool.employees} employees · last used ${formatRelative(tool.lastUsedAt)}`,
+      })),
+    [d?.tools],
+  );
+
+  const classificationSlices = useMemo(
+    () =>
+      (d?.classifications ?? []).map((c) => {
+        const info = classificationOf(c.classification);
+        return {
+          name: info.label,
+          value: c.sessions,
+          formatted: `${c.sessions}`,
+          color: info.productive
+            ? c.classification === "engineering_output"
+              ? "var(--chart-2)"
+              : c.classification === "assisted_editing"
+                ? "var(--chart-1)"
+                : "var(--chart-6)"
+            : "var(--chart-idle)",
         };
-        setData(team);
+      }),
+    [d?.classifications],
+  );
 
-        if (!ok) {
-          setBanner({
-            variant: "error",
-            title: status === 401 ? "Session expired" : "Request failed",
-            detail: json.message as string | undefined,
-          });
-        } else if (json.dbAvailable === false) {
-          setBanner({
-            variant: "warning",
-            title: "Database not connected",
-            detail:
-              json.hint ??
-              "Start Docker Desktop, then: docker compose up -d postgres redis",
-          });
-        } else {
-          setBanner(null);
-        }
-      } catch {
-        setBanner({
-          variant: "error",
-          title: "Cannot reach API",
-          detail: `Is the API running at ${API_BASE}?`,
-        });
-        setData({
-          connectors: [],
-          developers: [],
-          alerts: [],
-          recentEvents: [],
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-    const id = setInterval(load, 30_000);
-    return () => clearInterval(id);
-  }, [filters.eventType, filters.provider, filters.developerId, token, isDeveloper, user?.developerId]);
-
-  useEffect(() => {
-    if (!token) return;
-    const es = new EventSource(streamUrl(token));
-    es.onmessage = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.data) as { at?: string };
-        if (parsed.at) setLiveAt(parsed.at);
-      } catch {
-        /* ignore */
-      }
-    };
-    return () => es.close();
-  }, [token]);
-
-  const events = (data?.recentEvents ?? []) as ActivityEventRow[];
-  const connectors = data?.connectors ?? [];
-  const developers = useMemo(() => {
-    let rows = data?.developers ?? [];
-    if (filters.coverageOnly) {
-      rows = rows.filter((d) => d.coverageWarning);
-    }
-    if (filters.connectorState) {
-      rows = rows.filter((d) => d.connectorState === filters.connectorState);
-    }
-    return rows;
-  }, [data?.developers, filters.coverageOnly, filters.connectorState]);
-
-  const onlineCount = connectors.filter((c) => {
-    const last = c.lastHeartbeat ?? c.last_heartbeat;
-    if (!last) return false;
-    return Date.now() - new Date(last).getTime() < 5 * 60 * 1000;
-  }).length;
-
-  const primaryProvider =
-    connectors.find((c) => c.provider)?.provider ??
-    events.find((e) => e.provider)?.provider;
-
-  const mix = interactionBuckets(events);
-  const agentVisible = mix
-    .filter((m) => m.name !== "Connector")
-    .reduce((s, m) => s + m.count, 0);
-  const heartbeatOnly =
-    events.length > 0 &&
-    agentVisible === 0 &&
-    events.every((e) => e.event_type === "heartbeat_sent");
-
-  const title = isDeveloper
-    ? `${user?.displayName?.split(" ")[0] ?? "Your"} overview`
-    : "Team overview";
-  const subtitle = isDeveloper
-    ? "What the agent performed in your connected tools — the same metadata managers see"
-    : `Near-live connector status and agent-visible activity for ${user?.displayName ?? "your org"}`;
-
-  async function runExport(format: "csv" | "pdf") {
-    if (!token) return;
-    try {
-      const result = await createExport(
-        token,
-        format,
-        filters.developerId || undefined,
-      );
-      const exportId =
-        result.exportId ??
-        result.downloadUrl?.replace(/^.*\//, "") ??
-        "";
-      if (!exportId) throw new Error("Export id missing from API");
-      await downloadActivityExport(token, exportId, format);
-    } catch (err) {
-      setBanner({
-        variant: "error",
-        title: "Export failed",
-        detail:
-          err instanceof Error
-            ? err.message
-            : "Check database migrations and sign-in role (manager/auditor/admin).",
-      });
-    }
-  }
+  const hasActivity = (t?.sessions ?? 0) > 0;
+  const coverage = d?.coverage;
+  const coverageIssues =
+    (coverage?.staleConnectors ?? 0) +
+    (coverage?.offlineConnectors ?? 0) +
+    (coverage?.pausedConnectors ?? 0);
 
   return (
-    <AppShell title={title} subtitle={subtitle}>
-      <CapabilityBanner provider={primaryProvider} />
-      <ProviderTierBSummary events={events} />
-      <AgentCollectionBanner
-        provider={primaryProvider}
-        heartbeatOnly={heartbeatOnly}
-      />
-
-      {showTeam ? (
-        <FilterBar
-          filters={filters}
-          onChange={setFilters}
-          liveAt={liveAt}
-          onExportCsv={() => void runExport("csv")}
-          onExportPdf={() => void runExport("pdf")}
-          developers={
-            (data?.developers ?? [])
-              .filter((d) => d.developerId)
-              .map((d) => ({
-                developerId: d.developerId as string,
-                displayName: d.displayName ?? "Developer",
-              }))
-          }
-          showExport={canExport}
-        />
-      ) : (
-        <p className="mb-4 text-xs text-slate-500">Refreshing every 30s · your data only</p>
-      )}
-
-      {banner ? (
-        <AlertBanner
-          variant={banner.variant}
-          title={banner.title}
-          detail={banner.detail}
-        />
-      ) : null}
-
-      {loading && !data ? (
-        <p className="text-sm text-slate-500">Loading dashboard…</p>
-      ) : (
-        <>
-          <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              label="Agent-visible events"
-              value={agentVisible}
-              hint="Excludes connector heartbeats"
-              accent="teal"
+    <AppShell
+      title={isSelfScope ? "Your AI activity" : "Organisation overview"}
+      subtitle={
+        isSelfScope
+          ? "Everything collected about you through your connected AI tools."
+          : `How AI coding tools are being used across Techlio · ${rangeLabel(range)}`
+      }
+      actions={
+        canViewTeam(user?.role) ? (
+          <Link href="/employees" className="btn-primary">
+            Employee directory
+          </Link>
+        ) : null
+      }
+    >
+      <FilterBar
+        right={
+          live.data?.generatedAt ? (
+            <span className="flex items-center gap-1.5 text-2xs text-ink-500">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-500" />
+              Live · updated {formatRelative(live.data.generatedAt)}
+            </span>
+          ) : null
+        }
+      >
+        <RangePicker value={range} onChange={setRange} />
+        {canViewTeam(user?.role) ? (
+          <>
+            <SelectFilter
+              label="Team"
+              value={team}
+              onChange={setTeam}
+              allLabel="All teams"
+              options={(meta.data?.teams ?? []).map((x) => ({ value: x, label: x }))}
             />
-            <StatCard
-              label="Connectors online"
-              value={`${onlineCount} / ${connectors.length || 0}`}
-              hint="Heartbeat within 5 min"
-              accent="emerald"
-            />
-            <StatCard
-              label="Coverage alerts"
-              value={data?.alerts?.length ?? 0}
-              hint="Gaps, pause, stale — not inactivity"
-              accent="amber"
-            />
-            <StatCard
-              label="Unassigned sessions"
-              value={
-                assignedVsUnassigned(events).find((d) => d.name === "Unassigned")
-                  ?.value ?? 0
-              }
-              hint="No project / work item"
-            />
-          </section>
-
-          {showTeam ? (
-            <section className="mb-6 grid gap-4 lg:grid-cols-2">
-              <TeamOverviewTable rows={developers} />
-              <AlertsPanel alerts={data?.alerts ?? []} />
-            </section>
-          ) : (
-            <section className="mb-6">
-              <AlertsPanel alerts={data?.alerts ?? []} />
-            </section>
-          )}
-
-          {showCharts ? (
-            <>
-          <section className="mb-6 grid gap-4 lg:grid-cols-3">
-            <div className="min-w-0 lg:col-span-2">
-              <HourlyInteractionChart data={hourlyInteractionSeries(events)} />
-            </div>
-            <div className="min-w-0">
-              <InteractionMixChart data={mix} />
-            </div>
-          </section>
-
-          <section className="mb-6 grid gap-4 lg:grid-cols-3">
-            <EventsTimelineChart data={eventsByHour(events)} />
-            <DonutChart
-              title="Task context"
-              subtitle="Assigned vs unassigned (FR-011)"
-              data={assignedVsUnassigned(events)}
-            />
-            <DonutChart
-              title="Outcomes"
-              subtitle="Succeeded / started / failed"
-              data={outcomesSplit(events)}
-            />
-          </section>
-
-          <section className="mb-6 grid gap-4 lg:grid-cols-2">
-            <EventTypesChart data={eventsByType(events)} />
-            <EngineeringChecksChart data={engineeringOutcomes(events)} />
-          </section>
-
-          <section className="mb-6 grid gap-4 lg:grid-cols-3">
-            <DonutChart
-              title="Tool categories"
-              subtitle="file_read, shell, test, build… when present"
-              data={toolCategories(events).map((d) => ({
-                name: d.name,
-                value: d.count,
+            <SelectFilter
+              label="AI tool"
+              value={provider}
+              onChange={setProvider}
+              allLabel="All AI tools"
+              width="w-[170px]"
+              options={(meta.data?.providers ?? []).map((p) => ({
+                value: p.id,
+                label: p.label,
               }))}
             />
-            <DonutChart
-              title="Coverage vs activity"
-              subtitle="Missing telemetry is not zero work"
-              data={coverageVsActivity(events)}
+          </>
+        ) : null}
+      </FilterBar>
+
+      {live.data?.dbAvailable === false ? (
+        <div className="mb-5">
+          <Callout tone="bad" title="Database not reachable">
+            {live.data.hint}
+          </Callout>
+        </div>
+      ) : null}
+
+      {analytics.error ? (
+        <Card>
+          <ErrorState
+            title="Could not load organisation analytics"
+            detail={analytics.error}
+            onRetry={analytics.reload}
+          />
+        </Card>
+      ) : analytics.loading ? (
+        <>
+          <StatSkeleton />
+          <div className="mt-5 card">
+            <ChartSkeleton height={260} />
+          </div>
+        </>
+      ) : !hasActivity ? (
+        <Card>
+          <EmptyState
+            variant={coverageIssues > 0 ? "connector-offline" : "no-activity"}
+            action={
+              <button type="button" className="btn-ghost" onClick={() => setRange({ preset: "30d" })}>
+                Widen to 30 days
+              </button>
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          {/* ---------------- KPI row ---------------- */}
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key metrics">
+            <StatTile
+              label="AI active time"
+              value={formatDuration(t!.activeMs, { compact: true })}
+              hint="vs previous period"
+              accent="brand"
+              current={t!.activeMs}
+              previous={prev!.activeMs}
+              help="Merged model and tool execution time. Overlapping operations are counted once, and this is not the same as a person's working time."
             />
-            <ProviderPieChart data={providerSplit(events)} />
+            <StatTile
+              label="Sessions"
+              value={formatNumber(t!.sessions)}
+              hint={`avg ${formatDuration(t!.avgSessionMs)} active`}
+              accent="teal"
+              current={t!.sessions}
+              previous={prev!.sessions}
+              help="Agent sessions that started in this period."
+            />
+            <StatTile
+              label={isSelfScope ? "Tools connected" : "Employees with activity"}
+              value={
+                isSelfScope
+                  ? String(d!.tools.length)
+                  : `${t!.activeEmployees} / ${d!.headcount.total}`
+              }
+              hint={
+                isSelfScope
+                  ? "AI tools you used"
+                  : `${d!.headcount.connected} have a registered connector`
+              }
+              accent="slate"
+              help="Employees with at least one observed agent session in this period."
+            />
+            <StatTile
+              label="Coverage warnings"
+              value={formatNumber(coverageIssues + (coverage?.employeesWithoutTelemetry ?? 0))}
+              hint="gaps, pauses, silent connectors"
+              accent={coverageIssues > 0 ? "amber" : "slate"}
+              invertDelta
+              help="Telemetry limitations. A coverage gap means the system cannot confirm what happened — it never means the person was idle."
+            />
           </section>
 
-          <section className="mb-6">
-            {!isDeveloper ? (
-              <div>
-                <h3 className="mb-3 text-lg font-semibold text-ink-900">
-                  Connectors
-                </h3>
-                <ConnectorCards connectors={connectors} />
-              </div>
-            ) : (
-              <div>
-                <h3 className="mb-3 text-lg font-semibold text-ink-900">
-                  Your connector
-                </h3>
-                <ConnectorCards connectors={connectors} />
-                <p className="mt-3 text-sm text-slate-600">
-                  Pause from My activity or the IDE companion. Pauses show as
-                  coverage gaps, never as proof you were inactive.
-                </p>
-              </div>
-            )}
+          {/* ---------------- Trend + split ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+            <Card className="xl:col-span-2">
+              <CardHeader
+                title="AI usage over time"
+                subtitle="Agent active time and in-session idle time, per day"
+              />
+              <CardBody className="pt-2">
+                <TrendChart data={d!.dailyTrend} />
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Observed time split"
+                subtitle="Never presented as a single number"
+              />
+              <CardBody>
+                <DurationSplit
+                  totalMs={t!.elapsedMs}
+                  totalLabel="Total session span observed"
+                  bands={[
+                    {
+                      label: "Productive agent activity",
+                      ms: t!.productiveMs,
+                      color: "var(--chart-2)",
+                      help: "Merged model and tool time in sessions that produced file changes, tests, builds, or exploration work.",
+                    },
+                    {
+                      label: "Other agent activity",
+                      ms: Math.max(0, t!.activeMs - t!.productiveMs),
+                      color: "var(--chart-1)",
+                      help: "Agent operations in sessions dominated by idle time.",
+                    },
+                    {
+                      label: "In-session idle",
+                      ms: t!.idleMs,
+                      color: "var(--chart-idle)",
+                      help: "Gaps over 10 minutes inside a session. The person may have been working without the agent — this is not non-work.",
+                    },
+                    {
+                      label: "Session, agent not running",
+                      ms: Math.max(0, t!.elapsedMs - t!.activeMs - t!.idleMs),
+                      color: "#e2e8f0",
+                      help: "Time inside the interactive session with no model or tool operation executing — reading, typing, reviewing.",
+                    },
+                  ]}
+                />
+              </CardBody>
+            </Card>
           </section>
 
-          <section>
-            <EventsTable events={events} />
+          {/* ---------------- Tools ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+            <Card>
+              <CardHeader title="AI tools in use" subtitle="By agent active time" />
+              <CardBody>
+                <BarList items={toolItems} />
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Session activity mix"
+                subtitle="What the agent was observed doing"
+              />
+              <CardBody>
+                <DonutChart
+                  data={classificationSlices}
+                  centerValue={formatNumber(t!.sessions)}
+                  centerLabel="sessions"
+                />
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Working-hour pattern"
+                subtitle="When agent activity happens (org timezone)"
+              />
+              <CardBody className="pt-2">
+                <HourPatternChart data={d!.hourPattern} />
+              </CardBody>
+            </Card>
           </section>
-            </>
+
+          {/* ---------------- Teams / categories / outcomes ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+            {canViewTeam(user?.role) ? (
+              <Card>
+                <CardHeader title="Teams" subtitle="Agent active time by team" href="/employees" />
+                <CardBody>
+                  <BarList
+                    items={d!.teams.map((x) => ({
+                      label: x.team,
+                      value: x.activeMs,
+                      formatted: formatDuration(x.activeMs),
+                      meta: `${x.employees} employees · ${x.sessions} sessions`,
+                      color: "var(--chart-2)",
+                    }))}
+                  />
+                </CardBody>
+              </Card>
+            ) : null}
+
+            <Card>
+              <CardHeader title="Tool categories" subtitle="Allowlisted categories only" />
+              <CardBody>
+                <BarList
+                  items={d!.toolCategories.slice(0, 7).map((c) => ({
+                    label: TOOL_CATEGORY_LABEL[c.category] ?? c.category,
+                    value: c.calls,
+                    formatted: formatNumber(c.calls),
+                    color: "var(--chart-5)",
+                  }))}
+                />
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader title="Engineering outcomes" subtitle="Observed check results" />
+              <CardBody>
+                <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-line">
+                  {[
+                    ["Model calls", formatNumber(t!.modelRequests)],
+                    ["Tool calls", formatNumber(t!.toolCalls)],
+                    ["File changes", formatNumber(t!.fileChanges)],
+                    ["Tests run", formatNumber(t!.testsRun)],
+                    ["Failed tests", formatNumber(t!.testsFailed)],
+                    ["Builds run", formatNumber(t!.buildsRun)],
+                    ["Failed builds", formatNumber(t!.buildsFailed)],
+                    [
+                      "Tokens in / out",
+                      t!.tokenInput == null
+                        ? "Not available"
+                        : `${formatNumber(t!.tokenInput)} / ${formatNumber(t!.tokenOutput)}`,
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={label} className="bg-card px-3 py-2.5">
+                      <dt className="label">{label}</dt>
+                      <dd className="num mt-0.5 text-sm font-semibold text-ink-900">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </CardBody>
+            </Card>
+          </section>
+
+          {/* ---------------- Live strip ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-2">
+            <Card>
+              <CardHeader
+                title="Latest sessions"
+                subtitle="Sessions with activity in the last 24 hours"
+              />
+              {(live.data?.activeSessions ?? []).length === 0 ? (
+                <EmptyState
+                  compact
+                  title="No recent sessions"
+                  body="No agent session has reported activity in the last 24 hours."
+                />
+              ) : (
+                <ul className="divide-y divide-line">
+                  {live.data!.activeSessions.slice(0, 6).map((s) => (
+                    <li key={s.sessionId} className="flex items-center gap-3 px-5 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/employees/${s.developerId}`}
+                            className="truncate text-sm font-medium text-ink-900 hover:text-brand-600"
+                          >
+                            {s.displayName}
+                          </Link>
+                          <ProviderBadge provider={s.provider} size="sm" />
+                        </div>
+                        <p className="hint truncate">
+                          {s.project ?? "No task selected"} · {s.eventCount} events ·{" "}
+                          {formatRelative(s.lastEventAt ?? s.startedAt)}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/sessions/${s.sessionId}`}
+                        className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
+                      >
+                        Open
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Coverage & connector health"
+                subtitle="Telemetry limitations, not activity judgements"
+                href={canViewTeam(user?.role) ? "/connectors" : undefined}
+                hrefLabel="Connectors"
+              />
+              <AlertList alerts={live.data?.alerts ?? []} />
+              {coverage ? (
+                <div className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
+                  {[
+                    ["Gap events", coverage.gapEvents],
+                    ["Partial sessions", coverage.partialSessions],
+                    ["Unassigned", coverage.unassignedSessions],
+                    ["No telemetry", coverage.employeesWithoutTelemetry],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="bg-card px-4 py-2.5">
+                      <p className="label">{label}</p>
+                      <p className="num mt-0.5 text-sm font-semibold text-ink-900">
+                        {formatNumber(Number(value))}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </Card>
+          </section>
+
+          {/* ---------------- Connector table ---------------- */}
+          {canViewTeam(user?.role) && (live.data?.connectors.length ?? 0) > 0 ? (
+            <section className="mt-5">
+              <Card>
+                <CardHeader
+                  title="Connectors"
+                  subtitle="One registered installation per employee and AI tool"
+                  href="/connectors"
+                />
+                <div className="overflow-x-auto">
+                  <table className="tbl">
+                    <thead>
+                      <tr>
+                        <th>Employee</th>
+                        <th>AI tool</th>
+                        <th>State</th>
+                        <th>Last heartbeat</th>
+                        <th className="text-right">Queue</th>
+                        <th>Version</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {live.data!.connectors.slice(0, 8).map((c) => (
+                        <tr key={c.deviceId}>
+                          <td>
+                            <Link
+                              href={`/employees/${c.developerId}`}
+                              className="text-sm font-medium text-ink-900 hover:text-brand-600"
+                            >
+                              {c.displayName}
+                            </Link>
+                            <span className="hint block">{c.team}</span>
+                          </td>
+                          <td>
+                            <ProviderBadge provider={c.provider} size="sm" />
+                          </td>
+                          <td>
+                            <ConnectorBadge state={c.state} />
+                          </td>
+                          <td className="num text-sm text-ink-500">
+                            {formatRelative(c.lastHeartbeat)}
+                          </td>
+                          <td className="num text-right text-sm text-ink-500">
+                            {c.queueDepth ?? "—"}
+                          </td>
+                          <td className="num text-sm text-ink-500">
+                            {c.connectorVersion ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </section>
           ) : null}
         </>
       )}

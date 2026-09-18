@@ -20,6 +20,8 @@ export interface ProviderCapability {
   /** Event catalog areas this provider cannot supply (FR-012). */
   missing: string[];
   emptyState: string;
+  /** Extra context shown next to the tool in the dashboard. */
+  note?: string;
 }
 
 export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
@@ -30,6 +32,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     hourly: true,
     missing: [],
     emptyState: "",
+    note: "Observed through Claude Code hooks — full session, model, and tool telemetry.",
   },
   codex: {
     id: "codex",
@@ -50,16 +53,12 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
   cursor: {
     id: "cursor",
     label: "Cursor",
-    tier: "B",
-    hourly: false,
-    missing: [
-      "session_boundaries",
-      "model_request",
-      "tool_calls",
-      "hourly_summary",
-    ],
-    emptyState:
-      "Provider does not expose this metric. Cursor Admin API is daily-only (Tier B); hourly session, model, and tool duration are not available.",
+    tier: "A",
+    hourly: true,
+    missing: [],
+    emptyState: "",
+    note:
+      "Observed through the local connector running inside Cursor. The Cursor Admin API is a separate daily-only feed and is not the source of these session metrics.",
   },
   github_copilot: {
     id: "github_copilot",
@@ -74,6 +73,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     ],
     emptyState:
       "Provider does not expose this metric. Copilot organization reports are daily-only.",
+    note: "Tier B: GitHub reports aggregate per day, so hourly and session metrics are unavailable.",
   },
   vscode: {
     id: "vscode",
@@ -83,6 +83,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     missing: ["model_request", "tool_calls"],
     emptyState:
       "VS Code companion records file and task metadata only — not model sessions.",
+    note: "Companion extension: file and task-context signals only.",
   },
 };
 

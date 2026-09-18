@@ -6,7 +6,11 @@ import {
   Post,
   UnauthorizedException,
 } from "@nestjs/common";
-import { authenticatePortalUser, seedPortalUsers } from "@techlio/server-core";
+import {
+  authenticatePortalUser,
+  homePathForRole,
+  seedPortalUsers,
+} from "@techlio/server-core";
 import { signUserToken, verifyUserToken } from "./jwt.js";
 
 @Controller("v1/auth")
@@ -32,14 +36,7 @@ export class AuthController {
         organizationId: user.organizationId,
         developerId: user.developerId ?? null,
       },
-      homePath:
-        user.role === "developer"
-          ? "/my-activity"
-          : user.role === "auditor"
-            ? "/audit"
-            : user.role === "administrator"
-              ? "/users"
-              : "/",
+      homePath: homePathForRole(user.role, user.developerId),
     };
   }
 

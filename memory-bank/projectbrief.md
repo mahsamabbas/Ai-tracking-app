@@ -1,9 +1,17 @@
 # Project brief
 
-**Product:** AI Agent Activity Monitoring Dashboard for Techlio.
+**Product:** Employee AI Activity Monitoring Dashboard for Techlio.
 
-**Objective:** Give managers timely, reviewable evidence of work visible through developers' AI coding agents—without timesheets, billing, or behaviour scoring.
+**Objective:** Show managers how AI coding tools — especially Cursor and Claude —
+are actually being used across the organisation, and let them drill from an
+org-wide view down to a single agent operation, without timesheets, billing, or
+behaviour scoring.
 
-**Scope boundary:** Observes connected AI agent activity only. Hourly summary is the authoritative reporting unit for MVP.
+**Core workflow:** Organisation → Employees → Employee details → AI tool →
+Sessions → Individual session details.
+
+**Scope boundary:** Observes connected AI agent activity only. The hourly summary
+remains the authoritative reporting unit for compliance purposes; the session is
+the unit managers actually navigate.
 
 **Sponsor:** Mahsam (CEO) · **PO:** Faisal (Manager)

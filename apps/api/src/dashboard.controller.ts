@@ -1,324 +1,252 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
+  NotFoundException,
   Param,
   Query,
-  UnauthorizedException,
+  Req,
   UseGuards,
 } from "@nestjs/common";
+import type { FastifyRequest } from "fastify";
 import {
+  activityTypeOf,
   canViewActivityEvents,
   canViewDeveloper,
-  canViewTeam,
   db,
-  connectorHealth,
-  hourlySnapshots,
-  agentSessions,
   getHourlySnapshotDetail,
   getOrgPolicy,
-  listOrgDevices,
-  listPortalUsers,
+  hourlySnapshots,
+  isDatabaseReady,
+  sql,
 } from "@techlio/server-core";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
+import { providerLabel } from "@techlio/event-schema";
 import { listRecentEvents } from "./services/ingest.js";
-import { DEV_DEVELOPER } from "./constants.js";
-import { DashboardAuthGuard, userFromRequest, requireRoles } from "./auth/guards.js";
-import type { FastifyRequest } from "fastify";
-import { Req } from "@nestjs/common";
+import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 
-function currentHourStartUtc(now = new Date()): Date {
-  return new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      now.getUTCHours(),
-    ),
-  );
+const STALE_MS = 5 * 60 * 1000;
+
+export interface LiveConnector {
+  deviceId: string;
+  developerId: string;
+  displayName: string;
+  team: string | null;
+  provider: string | null;
+  connectorVersion: string | null;
+  lastHeartbeat: string | null;
+  queueDepth: number | null;
+  paused: boolean;
+  state: "online" | "stale" | "paused" | "offline";
+}
+
+export interface LiveAlert {
+  severity: "info" | "warning" | "error";
+  code: string;
+  message: string;
+  developerId?: string;
+  displayName?: string;
+  deviceId?: string;
 }
 
 @Controller("v1")
 export class DashboardController {
-  @Get("dashboard/team")
+  /**
+   * Near-live operational status (FR-020, FR-021). Deliberately small — the
+   * heavy aggregates live behind /v1/analytics/* so this stays fast to poll.
+   */
+  @Get("dashboard/live")
   @UseGuards(DashboardAuthGuard)
-  async team(
-    @Req() req: FastifyRequest,
-    @Query("developerId") developerId?: string,
-    @Query("eventType") eventType?: string,
-    @Query("provider") provider?: string,
-  ) {
+  async live(@Req() req: FastifyRequest, @Query("limit") limit?: string) {
     const user = userFromRequest(req);
     requireRoles(user, ["administrator", "manager", "developer", "auditor"]);
 
-    const requestedDeveloperId =
-      user.role === "developer"
-        ? user.developerId ?? DEV_DEVELOPER
-        : canViewTeam(user) && developerId
-          ? developerId
-          : undefined;
-
-    if (
-      requestedDeveloperId &&
-      user.role === "developer" &&
-      !canViewDeveloper(user, requestedDeveloperId)
-    ) {
-      throw new UnauthorizedException();
-    }
-
-    try {
-      const health = await db
-        .select()
-        .from(connectorHealth)
-        .where(eq(connectorHealth.organizationId, user.organizationId));
-
-      const deviceRows = await listOrgDevices(user.organizationId).catch(
-        () => [],
-      );
-      const members = await listPortalUsers(user.organizationId).catch(() => []);
-
-      const deviceToDeveloper = new Map(
-        deviceRows.map((d) => [d.id, d.developerId]),
-      );
-      const nameByDeveloper = new Map<string, string>();
-      for (const m of members) {
-        if (m.developerId) nameByDeveloper.set(m.developerId, m.displayName);
-      }
-
-      let sessions: (typeof agentSessions.$inferSelect)[] = [];
-      try {
-        sessions = await db
-          .select()
-          .from(agentSessions)
-          .where(
-            and(
-              eq(agentSessions.organizationId, user.organizationId),
-              isNull(agentSessions.endedAt),
-            ),
-          )
-          .limit(40);
-      } catch {
-        sessions = [];
-      }
-
-      const includeEvents = canViewActivityEvents(user);
-      const pool = includeEvents
-        ? await listRecentEvents(user.organizationId, 200, {
-            developerId: requestedDeveloperId,
-          })
-        : [];
-      const events = includeEvents
-        ? await listRecentEvents(user.organizationId, 50, {
-            developerId: requestedDeveloperId,
-            eventType,
-            provider,
-          })
-        : [];
-
-      const hourStart = currentHourStartUtc();
-      const hourEnd = new Date(hourStart.getTime() + 3600_000);
-
-      const developerIds = new Set<string>();
-      for (const m of members) {
-        if (m.role === "developer" && m.developerId) {
-          developerIds.add(m.developerId);
-        }
-      }
-      for (const d of deviceRows) developerIds.add(d.developerId);
-      for (const h of health) {
-        developerIds.add(deviceToDeveloper.get(h.deviceId) ?? DEV_DEVELOPER);
-      }
-
-      const developers = [...developerIds]
-        .filter((id) => {
-          if (user.role === "developer") return id === requestedDeveloperId;
-          if (requestedDeveloperId) return id === requestedDeveloperId;
-          return true;
-        })
-        .map((devId) => {
-          const deviceIds = deviceRows
-            .filter((d) => d.developerId === devId)
-            .map((d) => d.id);
-          const healthRows = health.filter((h) => {
-            const mapped = deviceToDeveloper.get(h.deviceId) ?? DEV_DEVELOPER;
-            return mapped === devId;
-          });
-          const h = healthRows[0];
-          const primaryDevice = h?.deviceId ?? deviceIds[0] ?? null;
-          const deviceEvents = pool.filter(
-            (e) =>
-              e.developer_id === devId ||
-              (primaryDevice && e.device_id === primaryDevice),
-          );
-          const lastEvent = deviceEvents[0]?.occurred_at ?? null;
-          const eventsThisHour = deviceEvents.filter((e) => {
-            const t = new Date(e.occurred_at).getTime();
-            return t >= hourStart.getTime() && t < hourEnd.getTime();
-          }).length;
-          const session =
-            sessions.find(
-              (s) =>
-                s.developerId === devId ||
-                (primaryDevice && s.deviceId === primaryDevice),
-            ) ?? null;
-          const paused = h?.paused === 1;
-          const hasHeartbeat = Boolean(h?.lastHeartbeat);
-          const stale =
-            hasHeartbeat &&
-            Date.now() - h!.lastHeartbeat!.getTime() > 5 * 60_000;
-          const connectorState = paused
-            ? "paused"
-            : !hasHeartbeat
-              ? "offline"
-              : stale
-                ? "stale"
-                : "online";
-          return {
-            developerId: devId,
-            displayName: nameByDeveloper.get(devId) ?? "Developer",
-            deviceId: primaryDevice,
-            provider: h?.provider ?? null,
-            connectorVersion: h?.version ?? null,
-            lastHeartbeat: h?.lastHeartbeat ?? null,
-            lastEventAt: lastEvent,
-            eventsThisHour,
-            queueDepth: h?.queueDepth ?? null,
-            paused,
-            coverageWarning: paused || !hasHeartbeat || stale,
-            connectorState,
-            currentSession: session
-              ? {
-                  sessionId: session.id,
-                  startedAt: session.startedAt,
-                  projectId: session.projectId,
-                  workItemId: session.workItemId,
-                  unassigned: session.unassigned,
-                }
-              : null,
-          };
-        });
-
-      const healthScoped = health.filter((h) => {
-        const mapped = deviceToDeveloper.get(h.deviceId) ?? DEV_DEVELOPER;
-        if (user.role === "developer") return mapped === requestedDeveloperId;
-        if (requestedDeveloperId) return mapped === requestedDeveloperId;
-        return true;
-      });
-
-      const alerts: {
-        severity: "info" | "warning" | "error";
-        code: string;
-        message: string;
-        deviceId?: string;
-        developerId?: string;
-      }[] = [];
-
-      for (const d of developers) {
-        if (d.connectorState === "offline") {
-          alerts.push({
-            severity: "warning",
-            code: "stale_connector",
-            message:
-              "Connector offline — no heartbeat recorded. Missing telemetry is not inactivity.",
-            deviceId: d.deviceId ?? undefined,
-            developerId: d.developerId,
-          });
-        }
-        if (d.connectorState === "stale") {
-          alerts.push({
-            severity: "warning",
-            code: "stale_connector",
-            message:
-              "Connector heartbeat missing — activity may be incomplete (coverage gap).",
-            deviceId: d.deviceId ?? undefined,
-            developerId: d.developerId,
-          });
-        }
-        if (d.paused) {
-          alerts.push({
-            severity: "info",
-            code: "collection_paused",
-            message: "Collection is paused; this is not developer inactivity.",
-            deviceId: d.deviceId ?? undefined,
-            developerId: d.developerId,
-          });
-        }
-        if (d.currentSession?.unassigned) {
-          alerts.push({
-            severity: "info",
-            code: "unassigned_session",
-            message: "Active session has no project/work item context.",
-            deviceId: d.deviceId ?? undefined,
-            developerId: d.developerId,
-          });
-        }
-      }
-
-      const gapEvents = pool.filter(
-        (e) =>
-          e.event_type === "telemetry_gap_started" ||
-          e.event_type === "upload_failed",
-      );
-      for (const g of gapEvents.slice(0, 3)) {
-        alerts.push({
-          severity: "warning",
-          code:
-            g.event_type === "upload_failed"
-              ? "upload_failed"
-              : "coverage_gap",
-          message: `Coverage gap recorded (${g.event_type}).`,
-          deviceId: g.device_id,
-        });
-      }
-
-      const showTeam =
-        user.role === "manager" ||
-        user.role === "administrator" ||
-        user.role === "auditor";
-
+    if (!(await isDatabaseReady())) {
       return {
-        connectors: healthScoped,
-        developers: showTeam || user.role === "developer" ? developers : [],
-        alerts,
-        recentEvents: events,
-        policy: getOrgPolicy(),
-        viewer: {
-          id: user.id,
-          displayName: user.displayName,
-          role: user.role,
-          email: user.email,
-          developerId: user.developerId ?? null,
-        },
-        dbAvailable: true,
-      };
-    } catch {
-      return {
+        dbAvailable: false,
+        hint: "Run: docker compose up -d postgres redis && pnpm db:migrate && pnpm db:seed",
         connectors: [],
-        developers: [],
+        activeSessions: [],
         alerts: [],
         recentEvents: [],
-        dbAvailable: false,
-        hint: "Start Docker and run: docker compose up -d postgres redis",
-        viewer: {
-          id: user.id,
-          displayName: user.displayName,
-          role: user.role,
-          email: user.email,
-          developerId: user.developerId ?? null,
-        },
+        viewer: viewerOf(user),
       };
     }
+
+    const selfOnly = user.role === "developer" ? user.developerId ?? "" : null;
+
+    const connectorRes = await db.execute<{
+      device_id: string;
+      developer_id: string;
+      display_name: string;
+      team: string | null;
+      provider: string | null;
+      version: string | null;
+      last_heartbeat: Date | null;
+      queue_depth: number | null;
+      paused: number | null;
+    }>(sql`
+      SELECT d.id AS device_id, d.developer_id, e.display_name, e.team,
+             COALESCE(ch.provider, d.provider) AS provider,
+             ch.version, ch.last_heartbeat, ch.queue_depth, ch.paused
+      FROM devices d
+      JOIN employees e ON e.id = d.developer_id
+      LEFT JOIN connector_health ch ON ch.device_id = d.id
+      WHERE d.organization_id = ${user.organizationId} AND d.revoked_at IS NULL
+        ${selfOnly !== null ? sql`AND d.developer_id = ${selfOnly}` : sql``}
+      ORDER BY e.display_name ASC
+    `);
+
+    const connectors: LiveConnector[] = connectorRes.rows.map((r) => {
+      const paused = r.paused === 1;
+      const last = r.last_heartbeat ? new Date(r.last_heartbeat) : null;
+      const state: LiveConnector["state"] = paused
+        ? "paused"
+        : !last
+          ? "offline"
+          : Date.now() - last.getTime() > STALE_MS
+            ? "stale"
+            : "online";
+      return {
+        deviceId: r.device_id,
+        developerId: r.developer_id,
+        displayName: r.display_name,
+        team: r.team,
+        provider: r.provider,
+        connectorVersion: r.version,
+        lastHeartbeat: last ? last.toISOString() : null,
+        queueDepth: r.queue_depth,
+        paused,
+        state,
+      };
+    });
+
+    const sessionRes = await db.execute<{
+      id: string;
+      developer_id: string;
+      display_name: string;
+      provider: string;
+      started_at: Date;
+      last_event_at: Date | null;
+      project_name: string | null;
+      unassigned: boolean;
+      active_duration_ms: string;
+      event_count: number;
+    }>(sql`
+      SELECT s.id, s.developer_id, e.display_name, s.provider, s.started_at,
+             s.last_event_at, p.name AS project_name, s.unassigned,
+             s.active_duration_ms, s.event_count
+      FROM agent_sessions s
+      JOIN employees e ON e.id = s.developer_id
+      LEFT JOIN projects p ON p.id = s.project_id
+      WHERE s.organization_id = ${user.organizationId}
+        AND COALESCE(s.last_event_at, s.started_at) > NOW() - INTERVAL '24 hours'
+        ${selfOnly !== null ? sql`AND s.developer_id = ${selfOnly}` : sql``}
+      ORDER BY COALESCE(s.last_event_at, s.started_at) DESC
+      LIMIT 12
+    `);
+
+    const activeSessions = sessionRes.rows.map((r) => ({
+      sessionId: r.id,
+      developerId: r.developer_id,
+      displayName: r.display_name,
+      provider: r.provider,
+      startedAt: new Date(r.started_at).toISOString(),
+      lastEventAt: r.last_event_at ? new Date(r.last_event_at).toISOString() : null,
+      project: r.project_name,
+      unassigned: r.unassigned,
+      activeMs: Number(r.active_duration_ms ?? 0),
+      eventCount: r.event_count,
+    }));
+
+    const recentEvents = canViewActivityEvents(user)
+      ? (
+          await listRecentEvents(user.organizationId, Math.min(Number(limit ?? 25) || 25, 100), {
+            developerId: selfOnly ?? undefined,
+          })
+        ).map((e) => ({ ...e, activity_type: activityTypeOf(e.event_type) }))
+      : [];
+
+    // One notice per employee per condition — several devices for the same
+    // person are named in a single line instead of repeating the warning.
+    const grouped = new Map<string, { state: string; developerId: string; displayName: string; tools: string[] }>();
+    for (const c of connectors) {
+      if (c.state === "online") continue;
+      const key = `${c.developerId}|${c.state}`;
+      const entry = grouped.get(key) ?? {
+        state: c.state,
+        developerId: c.developerId,
+        displayName: c.displayName,
+        tools: [],
+      };
+      entry.tools.push(providerLabel(c.provider ?? undefined));
+      grouped.set(key, entry);
+    }
+
+    const alerts: LiveAlert[] = [...grouped.values()].map((g) => {
+      const tools = g.tools.join(", ");
+      if (g.state === "offline") {
+        return {
+          severity: "warning" as const,
+          code: "connector_offline",
+          message: `${g.displayName} has no telemetry from ${tools} — the connector has never reported a heartbeat. Missing telemetry is not inactivity.`,
+          developerId: g.developerId,
+          displayName: g.displayName,
+        };
+      }
+      if (g.state === "paused") {
+        return {
+          severity: "info" as const,
+          code: "collection_paused",
+          message: `${g.displayName} paused collection on ${tools}. A coverage gap is recorded; this is not a conclusion about their work.`,
+          developerId: g.developerId,
+          displayName: g.displayName,
+        };
+      }
+      return {
+        severity: "warning" as const,
+        code: "stale_connector",
+        message: `${g.displayName}'s ${tools} connector stopped sending heartbeats — activity for this period may be incomplete.`,
+        developerId: g.developerId,
+        displayName: g.displayName,
+      };
+    });
+    for (const s of activeSessions.filter((s) => s.unassigned).slice(0, 3)) {
+      alerts.push({
+        severity: "info",
+        code: "unassigned_activity",
+        message: `${s.displayName} has a recent session with no project or work item selected.`,
+        developerId: s.developerId,
+        displayName: s.displayName,
+      });
+    }
+
+    return {
+      dbAvailable: true,
+      connectors,
+      activeSessions,
+      alerts,
+      recentEvents,
+      policy: getOrgPolicy(),
+      viewer: viewerOf(user),
+      generatedAt: new Date().toISOString(),
+    };
   }
 
+  /** FR-022 — hourly cards for one developer. */
   @Get("developers/:id/timeline")
   @UseGuards(DashboardAuthGuard)
   async timeline(
     @Param("id") developerId: string,
     @Req() req: FastifyRequest,
+    @Query("hours") hours?: string,
   ) {
     const user = userFromRequest(req);
     if (!canViewDeveloper(user, developerId)) {
-      throw new UnauthorizedException();
+      throw new ForbiddenException("out_of_scope");
     }
+    const lookback = Math.min(Number(hours ?? 48) || 48, 24 * 14);
+    const since = new Date(Date.now() - lookback * 3600_000);
     const snapshots = await db
       .select()
       .from(hourlySnapshots)
@@ -326,31 +254,33 @@ export class DashboardController {
         and(
           eq(hourlySnapshots.developerId, developerId),
           eq(hourlySnapshots.organizationId, user.organizationId),
+          gte(hourlySnapshots.hourStart, since),
         ),
       )
       .orderBy(desc(hourlySnapshots.hourStart));
     return { hourlyCards: snapshots };
   }
 
+  /** FR-025 — drill from an hourly summary to its source events. */
   @Get("hourly-snapshots/:id")
   @UseGuards(DashboardAuthGuard)
-  async hourlySnapshot(
-    @Param("id") id: string,
-    @Req() req: FastifyRequest,
-  ) {
+  async hourlySnapshot(@Param("id") id: string, @Req() req: FastifyRequest) {
     const user = userFromRequest(req);
     const detail = await getHourlySnapshotDetail(user.organizationId, id);
-    if (!detail.snapshot) {
-      return { error: "not_found" };
-    }
+    if (!detail.snapshot) throw new NotFoundException("snapshot_not_found");
     if (!canViewDeveloper(user, detail.snapshot.developerId)) {
-      throw new UnauthorizedException();
+      throw new ForbiddenException("out_of_scope");
     }
     return detail;
   }
+}
 
-  @Get("stream")
-  stream() {
-    return { mode: "sse", url: "/v1/stream/sse" };
-  }
+function viewerOf(user: ReturnType<typeof userFromRequest>) {
+  return {
+    id: user.id,
+    displayName: user.displayName,
+    role: user.role,
+    email: user.email,
+    developerId: user.developerId ?? null,
+  };
 }

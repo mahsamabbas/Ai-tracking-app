@@ -5,9 +5,34 @@ import {
   timestamp,
   jsonb,
   integer,
+  bigint,
   boolean,
+  index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+
+export const organizations = pgTable("organizations", {
+  id: uuid("id").primaryKey(),
+  name: text("name").notNull(),
+  timezone: text("timezone").notNull().default("UTC"),
+});
+
+/** The monitored people. `id` is the developer_id carried on every event. */
+export const employees = pgTable(
+  "employees",
+  {
+    id: uuid("id").primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    displayName: text("display_name").notNull(),
+    email: text("email"),
+    team: text("team"),
+    title: text("title"),
+    status: text("status").notNull().default("active"),
+    joinedAt: timestamp("joined_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("employees_org_idx").on(t.organizationId)],
+);
 
 export const activityEvents = pgTable(
   "activity_events",
@@ -54,6 +79,8 @@ export const connectorHealth = pgTable("connector_health", {
   queueDepth: integer("queue_depth"),
   paused: integer("paused").default(0),
   provider: text("provider"),
+  /** Demo-only: the state seeded data is meant to show. NULL for real connectors. */
+  demoState: text("demo_state"),
 });
 
 export const devices = pgTable("devices", {
@@ -62,6 +89,8 @@ export const devices = pgTable("devices", {
   developerId: uuid("developer_id").notNull(),
   tokenHash: text("token_hash").notNull(),
   publicKey: text("public_key"),
+  provider: text("provider"),
+  label: text("label"),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
@@ -81,18 +110,58 @@ export const workItems = pgTable("work_items", {
   externalRef: text("external_ref"),
 });
 
-export const agentSessions = pgTable("agent_sessions", {
-  id: uuid("id").primaryKey(),
-  organizationId: uuid("organization_id").notNull(),
-  developerId: uuid("developer_id").notNull(),
-  deviceId: uuid("device_id").notNull(),
-  provider: text("provider").notNull(),
-  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
-  endedAt: timestamp("ended_at", { withTimezone: true }),
-  projectId: uuid("project_id"),
-  workItemId: uuid("work_item_id"),
-  unassigned: boolean("unassigned").notNull().default(false),
-});
+export const agentSessions = pgTable(
+  "agent_sessions",
+  {
+    id: uuid("id").primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    developerId: uuid("developer_id").notNull(),
+    deviceId: uuid("device_id").notNull(),
+    provider: text("provider").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    lastEventAt: timestamp("last_event_at", { withTimezone: true }),
+    projectId: uuid("project_id"),
+    workItemId: uuid("work_item_id"),
+    unassigned: boolean("unassigned").notNull().default(false),
+
+    /** §11 — the five durations are stored separately and never summed into one. */
+    modelDurationMs: bigint("model_duration_ms", { mode: "number" }).notNull().default(0),
+    toolDurationMs: bigint("tool_duration_ms", { mode: "number" }).notNull().default(0),
+    activeDurationMs: bigint("active_duration_ms", { mode: "number" }).notNull().default(0),
+    interactiveSpanMs: bigint("interactive_span_ms", { mode: "number" }).notNull().default(0),
+    elapsedSpanMs: bigint("elapsed_span_ms", { mode: "number" }).notNull().default(0),
+    idleDurationMs: bigint("idle_duration_ms", { mode: "number" }).notNull().default(0),
+
+    eventCount: integer("event_count").notNull().default(0),
+    modelRequests: integer("model_requests").notNull().default(0),
+    toolCalls: integer("tool_calls").notNull().default(0),
+    testsRun: integer("tests_run").notNull().default(0),
+    testsPassed: integer("tests_passed").notNull().default(0),
+    testsFailed: integer("tests_failed").notNull().default(0),
+    buildsRun: integer("builds_run").notNull().default(0),
+    buildsFailed: integer("builds_failed").notNull().default(0),
+    fileChanges: integer("file_changes").notNull().default(0),
+    failures: integer("failures").notNull().default(0),
+
+    tokenInput: bigint("token_input", { mode: "number" }),
+    tokenOutput: bigint("token_output", { mode: "number" }),
+
+    modelsUsed: jsonb("models_used").notNull().default([]),
+    toolCategories: jsonb("tool_categories").notNull().default({}),
+
+    classification: text("classification").notNull().default("exploration"),
+    coverageState: text("coverage_state").notNull().default("complete"),
+    metricsAt: timestamp("metrics_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("agent_sessions_org_dev_started_idx").on(
+      t.organizationId,
+      t.developerId,
+      t.startedAt,
+    ),
+  ],
+);
 
 export const sessionContextVersions = pgTable("session_context_versions", {
   id: uuid("id").primaryKey().defaultRandom(),

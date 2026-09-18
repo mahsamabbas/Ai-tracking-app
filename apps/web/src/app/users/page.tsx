@@ -1,136 +1,191 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Callout } from "@/components/ui/Callout";
+import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
+import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
-import { createPortalUser, fetchUsers } from "@/lib/client-api";
-import type { Role } from "@/lib/api";
+import { apiPost } from "@/lib/api";
+import { ROLE_LABEL } from "@/lib/permissions";
+import type { Role } from "@/lib/types";
 
-type OrgUser = {
+interface OrgUser {
   id: string;
-  email?: string;
+  email: string;
   displayName: string;
   role: Role;
   developerId?: string | null;
+}
+
+const ROLE_TONE: Record<Role, "info" | "ok" | "neutral" | "warn"> = {
+  administrator: "warn",
+  manager: "info",
+  developer: "ok",
+  auditor: "neutral",
 };
 
 export default function UsersPage() {
   const { token } = useAuth();
-  const [users, setUsers] = useState<OrgUser[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const query = useApi<{ users: OrgUser[] }>("/v1/users");
   const [form, setForm] = useState({
     displayName: "",
     email: "",
     password: "",
     role: "developer" as Role,
   });
-
-  async function load() {
-    if (!token) return;
-    const { ok, json } = await fetchUsers(token);
-    if (!ok) {
-      setError("Only administrators can manage users.");
-      return;
-    }
-    setUsers(json.users ?? []);
-    setError(null);
-  }
-
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  const [notice, setNotice] = useState<{ tone: "info" | "bad"; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
-    if (!token) return;
-    const { ok, json } = await createPortalUser(token, form);
-    if (!ok || json.error) {
-      setError(json.error ?? "Could not create user");
-      return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await apiPost<{ error?: string }>("/v1/users", token, form);
+      if (res.error) throw new Error(res.error.replace(/_/g, " "));
+      setForm({ displayName: "", email: "", password: "", role: "developer" });
+      setNotice({ tone: "info", text: `${form.displayName} was added to the organisation.` });
+      query.reload();
+    } catch (err) {
+      setNotice({
+        tone: "bad",
+        text: err instanceof Error ? err.message : "Could not create the user",
+      });
+    } finally {
+      setBusy(false);
     }
-    setForm({ displayName: "", email: "", password: "", role: "developer" });
-    await load();
   }
+
+  const users = query.data?.users ?? [];
 
   return (
     <AppShell
-      title="Users"
-      subtitle="Organization membership and roles (administrator only)"
+      title="Access"
+      subtitle="Organisation membership and role scope (administrators only)"
     >
-      {error ? <p className="mb-4 text-sm text-rose-600">{error}</p> : null}
+      {notice ? (
+        <div className="mb-5">
+          <Callout tone={notice.tone} title={notice.text} />
+        </div>
+      ) : null}
 
-      <section className="card mb-6">
-        <h3 className="text-sm font-semibold text-ink-900">Register a user</h3>
-        <p className="mt-1 text-xs text-slate-500">
-          Developers are bound to their own activity. Managers see the team.
-          Auditors are read-only.
-        </p>
-        <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={onCreate}>
-          <input
-            className="min-h-[40px] rounded-lg border border-slate-300 px-3 text-sm"
-            placeholder="Display name"
-            value={form.displayName}
-            onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-            required
-          />
-          <input
-            className="min-h-[40px] rounded-lg border border-slate-300 px-3 text-sm"
-            placeholder="Email"
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            required
-          />
-          <input
-            className="min-h-[40px] rounded-lg border border-slate-300 px-3 text-sm"
-            placeholder="Temporary password"
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
-          />
-          <select
-            className="min-h-[40px] rounded-lg border border-slate-300 px-3 text-sm"
-            value={form.role}
-            onChange={(e) =>
-              setForm({ ...form, role: e.target.value as Role })
-            }
-          >
-            <option value="developer">Developer</option>
-            <option value="manager">Manager</option>
-            <option value="administrator">Administrator</option>
-            <option value="auditor">Auditor</option>
-          </select>
-          <button type="submit" className="btn-primary sm:col-span-2">
-            Create user
-          </button>
-        </form>
-      </section>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card>
+          <CardHeader title="Add a user" subtitle="Roles decide what every API and screen returns" />
+          <CardBody>
+            <form className="space-y-3" onSubmit={onCreate}>
+              <label className="block">
+                <span className="label mb-1 block">Display name</span>
+                <input
+                  className="field"
+                  value={form.displayName}
+                  onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="block">
+                <span className="label mb-1 block">Email</span>
+                <input
+                  className="field"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="block">
+                <span className="label mb-1 block">Temporary password</span>
+                <input
+                  className="field"
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="block">
+                <span className="label mb-1 block">Role</span>
+                <select
+                  className="field"
+                  value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
+                >
+                  {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                    <option key={r} value={r}>
+                      {ROLE_LABEL[r]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit" className="btn-primary w-full" disabled={busy}>
+                {busy ? "Creating…" : "Create user"}
+              </button>
+            </form>
+            <p className="hint mt-4">
+              Creating a developer also issues a developer id, which every event they generate is
+              scoped to. Registration is written to the audit log.
+            </p>
+          </CardBody>
+        </Card>
 
-      <div className="card overflow-hidden p-0">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Developer id</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td className="px-4 py-3 font-medium">{u.displayName}</td>
-                <td className="px-4 py-3 text-slate-600">{u.email ?? "—"}</td>
-                <td className="px-4 py-3">{u.role}</td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                  {u.developerId ? `${u.developerId.slice(0, 8)}…` : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Card className="xl:col-span-2">
+          <CardHeader title="Members" subtitle={`${users.length} in this organisation`} />
+          {query.error ? (
+            <ErrorState
+              title="Could not load members"
+              detail={
+                query.status === 403
+                  ? "Only administrators can manage organisation access."
+                  : query.error
+              }
+              onRetry={query.reload}
+            />
+          ) : query.loading ? (
+            <LoadingBlock rows={6} />
+          ) : users.length === 0 ? (
+            <EmptyState variant="no-results" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Monitored activity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id}>
+                      <td className="text-sm font-medium text-ink-900">{u.displayName}</td>
+                      <td className="text-sm text-ink-500">{u.email}</td>
+                      <td>
+                        <Badge tone={ROLE_TONE[u.role]}>{ROLE_LABEL[u.role]}</Badge>
+                      </td>
+                      <td>
+                        {u.developerId ? (
+                          <Link
+                            href={`/employees/${u.developerId}`}
+                            className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                          >
+                            View analytics →
+                          </Link>
+                        ) : (
+                          <span className="hint">Not monitored</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
       </div>
     </AppShell>
   );

@@ -1,59 +1,119 @@
-# Techlio AI Agent Activity Monitoring
+# Techlio · AI Agent Activity Monitoring
 
-Monorepo for the AI Agent Activity Monitoring Dashboard (PRD v0.2).
+An employee AI-activity monitoring dashboard. It shows managers how AI coding
+tools — Cursor, Claude Code, Copilot — are actually being used across an
+organisation, and lets them drill from the org down to a single agent operation:
+
+```
+Organisation → Employees → Employee → AI tool → Sessions → Session detail
+```
+
+It is an **operational visibility** product, not timekeeping. It never accepts
+timesheets, never ranks people, and never treats missing telemetry as proof that
+someone was not working. See [memory-bank/requirements.md](memory-bank/requirements.md)
+(PRD v0.2) — every screen traces back to it.
 
 ## Quick start
 
-1. **Start Docker Desktop** (required for Postgres + Redis).
+Requires Docker (Postgres + Redis) and pnpm.
 
 ```bash
-cd /Users/macbookpro/Documents/TechlioTrackingApp
 pnpm install
 docker compose up -d postgres redis
-# If Postgres already existed before 002 migration, run once:
-# docker exec -i $(docker compose ps -q postgres) psql -U techlio -d techlio_activity < infra/sql/002_devices_projects_sessions.sql
-pnpm build
-pnpm dev
+pnpm db:migrate     # applies infra/sql/*.sql once each, tracked in schema_migrations
+pnpm db:seed        # 90 days of realistic telemetry for a 12-person org
+pnpm dev            # API :3001, web :3000, connector :9477
 ```
 
-- **Technical overview (architecture & data flow):** [docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md)
-- **UI vs PRD coverage:** [docs/UI_PRD_COVERAGE.md](docs/UI_PRD_COVERAGE.md)
-- **API reference:** [docs/api.md](docs/api.md)
+Then open <http://localhost:3000> and sign in.
 
-That starts **API (3001), web (3000), and connector (9477)** in parallel. Optional hourly jobs: `pnpm dev:worker` in a second terminal (needs Redis). Tier B provider pulls: `CURSOR_API_KEY` (Cursor daily + Analytics APIs), `GITHUB_TOKEN` + `GITHUB_ORG` (Copilot daily user report).
+| Portal | Email | Password | Lands on |
+|--------|-------|----------|----------|
+| Manager | `manager@techlio.local` | `manager123` | Organisation overview |
+| Administrator | `admin@techlio.local` | `admin123` | Organisation overview + access & connectors |
+| Developer | `developer@techlio.local` | `developer123` | Their own analytics only |
+| Auditor | `auditor@techlio.local` | `auditor123` | Audit history, no individual timelines |
 
-**Do not** paste several `pnpm … dev` lines in one block with `# comments` on the same line — only the first command runs until you stop it.
+Optional: `pnpm dev:worker` (hourly finalisation, late-event recalculation,
+retention, Tier B provider pulls — needs Redis).
 
-| Service   | URL |
-|-----------|-----|
-| Dashboard | http://localhost:3000 |
-| API       | http://localhost:3001 |
-| Connector | http://127.0.0.1:9477 |
+## The screens
 
-## Packages
+| Route | Who | What it answers |
+|-------|-----|-----------------|
+| `/` | Manager, admin, developer | How is the org using AI tools right now and over time? |
+| `/employees` | Manager, admin | Who uses what, how much, and whose telemetry is incomplete? |
+| `/employees/[id]` | Manager, admin, self | One person: usage, trends, patterns, tools, projects, idle periods, sessions |
+| `/employees/[id]/tools/[provider]` | Manager, admin, self | That person's use of one AI tool specifically |
+| `/employees/[id]/sessions` | Manager, admin, self | Full session history with tool / activity / project filters |
+| `/sessions/[id]` | Manager, admin, self | One session: durations, metrics, task context, full event trail |
+| `/hourly/[id]` | Manager, admin, self | One clock hour's deterministic summary and its source events |
+| `/connectors` | Admin, manager, auditor | Connector health, pause/resume, credential revocation |
+| `/users` | Admin | Organisation membership and roles |
+| `/audit` | Auditor, admin | Append-only access and configuration history |
+| `/policy` | All | What is collected, what never is, retention, and your rights |
 
-- `@techlio/event-schema` — normalized events (Section 9–10)
-- `@techlio/aggregation` — hourly duration metrics
-- `@techlio/provider-adapters` — Claude hooks → events
-- `@techlio/puller` — Cursor / Copilot Tier B
-- `@techlio/server-core` — ingest, DB, hourly finalize
-- Apps: `connector`, `api`, `worker`, `web`, `extension`
+Every date filter accepts today / yesterday / 7d / 30d / 90d / custom, and every
+figure is compared against the immediately preceding period of the same length.
 
-## Policy
+## How the numbers work
 
-See `docs/policy/monitoring-notice-draft.md` before enabling monitoring on employee machines.
+The five duration metrics are stored and displayed **separately** — the PRD
+forbids merging them into one headline number:
 
-The local connector labels the **host IDE** as the provider (Cursor when you run this repo in Cursor). Claude Code events are only tagged `claude_code` when Claude hooks actually fire. Cursor is Tier B: hourly model/tool metrics are not available from the provider.
+| Metric | Meaning |
+|--------|---------|
+| Model duration | Time model requests were executing |
+| Tool duration | Time tool, test, and build operations were executing |
+| Merged active | Union of the two above — parallel calls counted once |
+| Interactive span | First to last event, minus gaps over the 10-minute idle threshold |
+| Elapsed span | First to last event, unadjusted |
 
-## Sign in (JWT portals)
+`Idle = elapsed − interactive`. Sessions carry an evidence-based classification
+(`engineering_output`, `assisted_editing`, `exploration`, `idle_dominant`) that
+describes *observed agent activity*, never a person's effort or worth.
 
-Open http://localhost:3000 — you will be redirected to `/login`.
+Metrics a provider does not report render as **“Not available from provider”**,
+never as zero. Coverage gaps, pauses, stale connectors, and unassigned sessions
+each have their own distinct empty state.
 
-| Portal | Email | Password |
-|--------|-------|----------|
-| Manager | `manager@techlio.local` | `manager123` |
-| Developer | `developer@techlio.local` | `developer123` |
-| Admin | `admin@techlio.local` | `admin123` |
-| Auditor | `auditor@techlio.local` | `auditor123` |
+## Layout
 
-Each JWT encodes role, org, and (for developers) `developerId`. Navigation and APIs are scoped to that role.
+| Package | Role |
+|---------|------|
+| `@techlio/event-schema` | Normalised event model and approved catalog (PRD §9–10), provider capabilities |
+| `@techlio/aggregation` | Interval merging and hourly duration rules (§11) |
+| `@techlio/server-core` | DB, ingest, sessionization, session metrics, analytics queries, RBAC, exports, seed |
+| `@techlio/provider-adapters` | Claude hooks → normalised events |
+| `@techlio/puller` | Tier B daily pulls (Cursor Admin API, Copilot reports) |
+| `apps/api` | NestJS + Fastify: ingest, analytics, auth, admin |
+| `apps/web` | Next.js 15 dashboard |
+| `apps/connector` | Local connector: redaction, signing, encrypted offline queue |
+| `apps/worker` | BullMQ jobs: hourly finalise, recalculation, retention |
+| `apps/extension` | VS Code / Cursor companion: file and task-context signals |
+
+- [Technical overview](docs/TECHNICAL_OVERVIEW.md)
+- [API reference](docs/api.md)
+- [PRD coverage](docs/UI_PRD_COVERAGE.md)
+- [Monitoring notice draft](docs/policy/monitoring-notice-draft.md) — read before enabling collection on anyone's machine
+
+## Demo data
+
+`pnpm db:seed` generates a deterministic 12-person organisation across four
+teams: ~2,300 sessions and ~237,000 events over 90 days, spanning Cursor, Claude
+Code, Copilot, and the VS Code companion. It deliberately includes the awkward
+cases the product must handle — stale and offline connectors, a paused one, a
+person with no telemetry at all, unassigned sessions, coverage gaps mid-session,
+failed tests and builds, weekend and idle patterns.
+
+Because seeded heartbeats are static, the API re-anchors *only* the seeded
+connector heartbeats once a minute so the intended online/stale/paused/offline
+mix stays visible. It touches nothing else, and is disabled with
+`DEMO_CONNECTOR_KEEPALIVE=0` or in production.
+
+## Privacy posture
+
+Prompts, model responses, source code, command text, keystrokes, and screenshots
+are never collected. Metadata is allowlisted in `@techlio/event-schema`, redacted
+at the connector, and re-scanned at ingest — events carrying secrets are rejected
+and raise an operational alert.

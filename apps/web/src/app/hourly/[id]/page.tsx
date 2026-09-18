@@ -1,136 +1,185 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { EventsTable } from "@/components/EventsTable";
-import { fetchHourlySnapshot } from "@/lib/client-api";
-import { useAuth } from "@/lib/auth-context";
+import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Callout } from "@/components/ui/Callout";
+import { Badge } from "@/components/ui/Badge";
+import { ErrorState, LoadingBlock, NotFoundState } from "@/components/ui/States";
+import { MetricGrid } from "@/components/domain/MetricGrid";
+import { EventTimeline } from "@/components/domain/EventTimeline";
+import { useApi } from "@/lib/use-api";
+import { formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import type { ActivityEventRow } from "@/lib/types";
-import { formatDuration } from "@/lib/analytics";
 
-const METRIC_ROWS: { key: string; label: string }[] = [
-  { key: "modelDurationMs", label: "Model duration" },
-  { key: "toolDurationMs", label: "Tool duration" },
-  { key: "mergedActiveDurationMs", label: "Merged active" },
-  { key: "interactiveSpanMs", label: "Interactive span" },
-  { key: "elapsedSessionSpanMs", label: "Elapsed session span" },
-  { key: "tokenInput", label: "Token input" },
-  { key: "tokenOutput", label: "Token output" },
-  { key: "testsCompleted", label: "Tests completed" },
-  { key: "buildsCompleted", label: "Builds completed" },
-  { key: "fileChanges", label: "File changes" },
-  { key: "eventCount", label: "Event count" },
-];
-
-function formatMetric(key: string, value: unknown): string {
-  if (value === undefined || value === null) return "Not available from provider";
-  if (key.endsWith("Ms")) return formatDuration(value as number);
-  if (typeof value === "number" && value === 0 && key.includes("Duration")) {
-    return "Not available from provider";
-  }
-  return String(value);
+interface SnapshotDetail {
+  snapshot: {
+    id: string;
+    developerId: string;
+    hourStart: string;
+    version: number;
+    completeness: string;
+    recalcReason: string | null;
+    metrics: Record<string, number | undefined>;
+  };
+  sourceEvents: ActivityEventRow[];
+  versions: { id: string; version: number; recalcReason: string | null }[];
 }
 
 export default function HourlyDetailPage() {
-  const { token } = useAuth();
   const params = useParams();
   const id = params.id as string;
-  const [data, setData] = useState<{
-    snapshot?: {
-      hourStart: string;
-      version: number;
-      metrics: Record<string, unknown>;
-      recalcReason?: string | null;
-      completeness?: string;
-    };
-    sourceEvents?: ActivityEventRow[];
-    versions?: { id: string; version: number; recalcReason: string | null }[];
-  } | null>(null);
+  const query = useApi<SnapshotDetail>(`/v1/hourly-snapshots/${id}`);
 
-  useEffect(() => {
-    if (!token) return;
-    void fetchHourlySnapshot(token, id).then(setData);
-  }, [id, token]);
+  if (query.status === 404) {
+    return (
+      <AppShell title="Hourly summary">
+        <NotFoundState backHref="/employees" backLabel="Back to directory" />
+      </AppShell>
+    );
+  }
 
-  const metrics = data?.snapshot?.metrics ?? {};
-  const versions = data?.versions ?? [];
+  const d = query.data;
+  const m = d?.snapshot.metrics ?? {};
 
   return (
     <AppShell
-      title="Hourly detail"
-      subtitle="Drill-down: metrics, versions, source events (FR-025)"
+      breadcrumbs={
+        <Breadcrumbs
+          items={[
+            { label: "Employees", href: "/employees" },
+            {
+              label: "Employee",
+              href: d ? `/employees/${d.snapshot.developerId}` : undefined,
+            },
+            { label: "Hourly summary" },
+          ]}
+        />
+      }
+      title={d ? `Hour of ${formatDateTime(d.snapshot.hourStart)}` : "Hourly summary"}
+      subtitle="Deterministic metrics linked to every source event that produced them"
+      actions={
+        d ? (
+          <Link href={`/employees/${d.snapshot.developerId}`} className="btn-ghost">
+            Employee analytics
+          </Link>
+        ) : null
+      }
     >
-      <p className="mb-4 text-sm text-slate-600">
-        <Link href="/developer-day" className="text-indigo-600 hover:underline">
-          ← Back to developer day
-        </Link>
-      </p>
-
-      {!data?.snapshot ? (
-        <p className="text-sm text-slate-500">Loading or snapshot not found…</p>
+      {query.error && query.status !== 404 ? (
+        <Card>
+          <ErrorState title="Could not load this summary" detail={query.error} onRetry={query.reload} />
+        </Card>
+      ) : query.loading || !d ? (
+        <Card>
+          <LoadingBlock rows={8} />
+        </Card>
       ) : (
         <>
-          <section className="card mb-6">
-            <p className="text-sm text-slate-600">
-              Hour:{" "}
-              <span className="font-medium text-slate-900">
-                {new Date(data.snapshot.hourStart).toLocaleString()}
-              </span>
-              {" · "}
-              Version {data.snapshot.version}
-              {data.snapshot.recalcReason
-                ? ` (${data.snapshot.recalcReason})`
-                : null}
-            </p>
-            {data.snapshot.completeness ? (
-              <p className="mt-1 text-xs text-slate-500">
-                Completeness: {data.snapshot.completeness}
-              </p>
-            ) : null}
-            <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              AI-generated hourly narrative (FR-024) is not enabled in this
-              prototype. Metrics below are deterministic and linked to source
-              events. Wording in any future narrative must use “the agent
-              performed,” not “the developer worked.”
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {METRIC_ROWS.map(({ key, label }) => (
-                <div key={key} className="rounded-lg bg-slate-50 px-3 py-2">
-                  <p className="text-xs text-slate-500">{label}</p>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {formatMetric(key, metrics[key])}
-                  </p>
-                </div>
-              ))}
+          {d.snapshot.completeness !== "complete" ? (
+            <div className="mb-5">
+              <Callout tone="warn" title="Partial hour">
+                Telemetry for this hour is incomplete. The gap is listed rather than filled in —
+                nothing is inferred about the missing interval.
+              </Callout>
             </div>
-          </section>
-
-          {versions.length > 1 ? (
-            <section className="mb-6">
-              <h3 className="mb-2 text-sm font-semibold text-slate-800">
-                Snapshot versions (late recalc)
-              </h3>
-              <ul className="text-sm text-slate-600">
-                {versions.map((v) => (
-                  <li key={v.id}>
-                    <Link
-                      href={`/hourly/${v.id}`}
-                      className="text-indigo-600 hover:underline"
-                    >
-                      v{v.version}
-                    </Link>
-                    {v.recalcReason ? ` — ${v.recalcReason}` : null}
-                  </li>
-                ))}
-              </ul>
-            </section>
           ) : null}
 
-          <section>
-            <EventsTable events={data.sourceEvents ?? []} />
-          </section>
+          <Card className="mb-5">
+            <CardHeader
+              title="Deterministic metrics"
+              subtitle="Reproducible from the source events below"
+              action={
+                <div className="flex items-center gap-1.5">
+                  <Badge tone="neutral">v{d.snapshot.version}</Badge>
+                  <Badge tone={d.snapshot.completeness === "complete" ? "ok" : "warn"}>
+                    {d.snapshot.completeness}
+                  </Badge>
+                </div>
+              }
+            />
+            <CardBody className="space-y-5">
+              <div>
+                <p className="label mb-2">Durations — never presented as one number</p>
+                <MetricGrid
+                  columns={5}
+                  metrics={[
+                    { label: "Model duration", value: formatDuration(m.modelDurationMs) },
+                    { label: "Tool duration", value: formatDuration(m.toolDurationMs) },
+                    {
+                      label: "Merged active",
+                      value: formatDuration(m.mergedActiveDurationMs),
+                      help: "Overlapping model and tool intervals merged before summing.",
+                    },
+                    {
+                      label: "Interactive span",
+                      value: formatDuration(m.interactiveSpanMs),
+                      help: "Excludes idle gaps over the configured threshold.",
+                    },
+                    { label: "Elapsed span", value: formatDuration(m.elapsedSessionSpanMs) },
+                  ]}
+                />
+              </div>
+              <div>
+                <p className="label mb-2">Counts</p>
+                <MetricGrid
+                  columns={5}
+                  metrics={[
+                    { label: "Events", value: formatNumber(m.eventCount ?? 0) },
+                    { label: "File changes", value: formatNumber(m.fileChanges ?? 0) },
+                    { label: "Tests completed", value: formatNumber(m.testsCompleted ?? 0) },
+                    { label: "Builds completed", value: formatNumber(m.buildsCompleted ?? 0) },
+                    {
+                      label: "Tokens in / out",
+                      value:
+                        (m.tokenInput ?? 0) === 0 && (m.tokenOutput ?? 0) === 0
+                          ? "Not available from provider"
+                          : `${formatNumber(m.tokenInput ?? 0)} / ${formatNumber(m.tokenOutput ?? 0)}`,
+                      unavailable: (m.tokenInput ?? 0) === 0 && (m.tokenOutput ?? 0) === 0,
+                    },
+                  ]}
+                />
+              </div>
+              <p className="hint">
+                No AI-generated narrative is attached to this hour. Every figure above is computed
+                deterministically from the source events and can be reproduced from them.
+              </p>
+            </CardBody>
+          </Card>
+
+          {d.versions.length > 1 ? (
+            <Card className="mb-5">
+              <CardHeader
+                title="Recalculation history"
+                subtitle="Late events create a new version; earlier snapshots are retained"
+              />
+              <CardBody>
+                <ul className="space-y-2">
+                  {d.versions.map((v) => (
+                    <li key={v.id} className="flex items-center gap-3 text-sm">
+                      <Badge tone={v.id === d.snapshot.id ? "info" : "neutral"}>v{v.version}</Badge>
+                      <Link href={`/hourly/${v.id}`} className="text-brand-600 hover:text-brand-700">
+                        Open snapshot
+                      </Link>
+                      <span className="hint">{v.recalcReason ?? "original"}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          <Card>
+            <CardHeader
+              title="Source events"
+              subtitle={`${d.sourceEvents.length} events in this clock hour`}
+            />
+            <CardBody className="max-h-[640px] overflow-y-auto pt-2">
+              <EventTimeline events={d.sourceEvents} limit={300} />
+            </CardBody>
+          </Card>
         </>
       )}
     </AppShell>

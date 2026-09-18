@@ -1,44 +1,88 @@
-# Techlio Activity API (v1)
+# API reference
 
-Base URL: `http://localhost:3001` (dev).
+Base URL `http://localhost:3001`. All dashboard endpoints require
+`Authorization: Bearer <jwt>` from `POST /v1/auth/login`. Every query is scoped
+to the caller's organisation and role; a developer can only ever resolve to
+their own `developerId`, and an auditor cannot read individual activity at all.
 
-## Authentication
+## Date ranges
 
-- **Dashboard:** `Authorization: Bearer <jwt>` from `POST /v1/auth/login`. Token encodes role, org, and `developerId` for developer portals.
-- **Connector ingest:** `Authorization: Bearer <device-token>` and `X-Device-Id: <uuid>` (optional if device id is in first event).
+Analytics endpoints accept either a preset or an explicit window:
 
-## Endpoints
+| Param | Values |
+|-------|--------|
+| `preset` | `today`, `yesterday`, `7d` (default), `30d`, `90d` |
+| `from` / `to` | ISO-8601 timestamps; `from` wins over `preset` |
+
+Each response echoes the resolved `range` and `preset`, and comparison figures
+(`previousTotals`) use the immediately preceding window of the same length.
+
+## Auth
 
 | Method | Path | Notes |
-|--------|------|--------|
-| POST | `/v1/auth/login` | `{ email, password }` → JWT + user |
-| GET | `/v1/auth/me` | Bearer JWT → current user |
-| POST | `/v1/connectors/register` | Admin (any developer) or developer (self). Returns `{ deviceId, token }` |
-| POST | `/v1/connectors/:id/revoke` | Admin only |
-| POST | `/v1/connectors/:id/heartbeat` | Bearer device token |
-| POST | `/v1/connectors/:id/pause` | Developer (own) or admin; coverage gap |
-| POST | `/v1/connectors/:id/resume` | Developer (own) or admin |
-| GET | `/v1/users` | Admin only |
-| POST | `/v1/users` | Admin only — create portal user |
-| GET | `/v1/org/developers` | Role-scoped developer list |
-| GET | `/v1/org/policy` | Retention and stale-heartbeat settings |
-| GET | `/v1/audit-log` | Auditor and admin |
-| POST | `/v1/events/batch` | Signed batch; idempotent by `event_id` |
-| GET | `/v1/projects` | Org-scoped project list |
-| GET | `/v1/work-items` | Optional `q`, `projectId` |
-| POST | `/v1/sessions/:id/context` | Task context change |
-| GET | `/v1/dashboard/team` | Filters: `developerId`, `eventType`, `provider` |
-| GET | `/v1/developers/:id/timeline` | Hourly cards |
-| GET | `/v1/hourly-snapshots/:id` | Metrics + source events + versions |
-| POST | `/v1/activity-exports` | Body: `{ format: "csv" \| "pdf" }` |
-| GET | `/v1/activity-exports/:id` | Download export |
-| GET | `/v1/stream/sse` | Server-Sent Events (15s tick) |
+|--------|------|-------|
+| POST | `/v1/auth/login` | `{ email, password }` → `{ token, user, homePath }` |
+| GET | `/v1/auth/me` | Verifies the token, returns the user |
 
-## Errors
+## Analytics
 
-- `401` — missing/invalid token or role
-- Rejected events may include `reasons: ["replay", "secret:...", "schema"]`
+| Method | Path | Returns |
+|--------|------|---------|
+| GET | `/v1/analytics/organization` | Org totals, previous-period totals, headcount, daily trend, tool distribution, hour and weekday patterns, session classifications, tool categories, coverage, per-team rollup. Filters: `team`, `provider` |
+| GET | `/v1/analytics/coverage` | Coverage summary alone (gap events, paused/stale/offline connectors, partial and unassigned sessions, employees with no telemetry) |
+| GET | `/v1/meta/filters` | Teams, projects, and provider capabilities for filter controls |
 
-## Database migrations
+## Employees
 
-After `001_init.sql`, apply `infra/sql/002_devices_projects_sessions.sql`.
+| Method | Path | Returns |
+|--------|------|---------|
+| GET | `/v1/employees` | Directory rows: connector state (worst across their devices), AI active / productive / idle time, sessions, average session, tools used, daily sparkline, last active. Filters: `search`, `team`, `provider`, `status`, `connectorState`, `sort` (`activity`\|`sessions`\|`recent`\|`name`) |
+| GET | `/v1/employees/{id}` | Profile, devices, totals, previous totals, daily trend, tools, hour/weekday patterns, classifications, tool categories, models, projects, idle periods, recent sessions |
+| GET | `/v1/employees/{id}/tools/{provider}` | The same shape scoped to one AI tool, plus that provider's declared capability limits and the tool's share of the employee's AI time |
+| GET | `/v1/employees/{id}/sessions` | Paged session history. Filters: `provider`, `classification`, `projectId`, `page`, `pageSize` |
+
+## Sessions and hours
+
+| Method | Path | Returns |
+|--------|------|---------|
+| GET | `/v1/sessions/{id}` | Session row with all five durations, project/work item, full source-event trail, versioned context changes, previous/next session ids, provider capability |
+| GET | `/v1/developers/{id}/timeline` | Hourly summary cards. `hours` (default 48, max 336) |
+| GET | `/v1/hourly-snapshots/{id}` | Deterministic metrics, recalculation versions, and the source events behind them |
+
+## Live status
+
+| Method | Path | Returns |
+|--------|------|---------|
+| GET | `/v1/dashboard/live` | Connector states, sessions active in the last 24h, grouped coverage alerts, recent events. `limit` caps the event list |
+| GET | `/v1/stream/sse` | Server-sent events for near-live updates. Polling `/v1/dashboard/live` is the supported fallback and is what the dashboard uses |
+
+## Ingestion (connector credentials, not user JWTs)
+
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/v1/events/batch` | Signed batch. Idempotent on `event_id`; rejects replays, org/device mismatches, and payloads containing secrets |
+| POST | `/v1/connectors/register` | Issues a revocable device credential |
+| POST | `/v1/connectors/{id}/heartbeat` | Health, version, queue depth, pause state |
+| POST | `/v1/connectors/{id}/pause` \| `/resume` | Records an authorised pause and emits a coverage-gap event |
+| POST | `/v1/connectors/{id}/revoke` | Administrator only |
+| GET | `/v1/connectors/{id}/health` | Single connector health |
+| POST | `/v1/sessions/{id}/context` | Versioned project / work-item context change |
+| POST | `/v1/events/timesheet` | Always `404`. No endpoint accepts submitted hours |
+
+## Organisation administration
+
+| Method | Path | Role |
+|--------|------|------|
+| GET/POST | `/v1/users` | Administrator |
+| GET | `/v1/org/developers` | Any signed-in role (scoped) |
+| GET | `/v1/org/policy` | Any signed-in role |
+| GET | `/v1/audit-log` | Auditor, administrator |
+| GET | `/v1/projects`, `/v1/work-items` | Any signed-in role |
+| POST | `/v1/activity-exports` | Manager, administrator. CSV or text; never includes billing conclusions |
+| GET | `/v1/activity-exports/{id}` | Downloads a previously created export |
+
+## Error shape
+
+Errors return the NestJS default: `{ statusCode, message, error }`. `403` means
+the record exists but is outside the caller's scope; `404` means it does not
+exist in their organisation.

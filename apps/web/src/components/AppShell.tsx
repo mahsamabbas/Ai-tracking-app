@@ -4,271 +4,249 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { useMounted } from "@/lib/use-mounted";
-import type { Role } from "@/lib/api";
-import { portalScopeCopy } from "@/lib/permissions";
+import { ROLE_LABEL, ROLE_SCOPE } from "@/lib/permissions";
+import { initialsOf } from "@/lib/format";
+import type { Role } from "@/lib/types";
 
-const ALL_NAV = [
-  { href: "/", label: "Overview", desc: "Live team signals", roles: ["manager", "administrator", "developer"] as Role[] },
-  { href: "/developer-day", label: "Developer day", desc: "Hourly timeline", roles: ["manager", "administrator", "developer"] as Role[] },
-  { href: "/my-activity", label: "My activity", desc: "Your own signals", roles: ["developer"] as Role[] },
-  { href: "/users", label: "Users", desc: "Org access", roles: ["administrator"] as Role[] },
-  { href: "/connectors", label: "Connectors", desc: "Health & versions", roles: ["administrator", "manager", "auditor"] as Role[] },
-  { href: "/policy", label: "Policy", desc: "Collection notice", roles: ["manager", "administrator", "auditor", "developer"] as Role[] },
-  { href: "/audit", label: "Audit", desc: "Access history", roles: ["auditor", "administrator"] as Role[] },
+interface NavItem {
+  href: string;
+  label: string;
+  roles: Role[];
+  icon: React.ReactNode;
+  match?: (path: string) => boolean;
+}
+
+const icon = (d: string) => (
+  <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+);
+
+const NAV: NavItem[] = [
+  {
+    href: "/",
+    label: "Overview",
+    roles: ["manager", "administrator", "developer"],
+    icon: icon("M3 10.5 10 4l7 6.5M5 9.5V16h10V9.5"),
+    match: (p) => p === "/",
+  },
+  {
+    // Developers get the same analytics surface, scoped to themselves.
+    href: "/employees/self",
+    label: "My activity",
+    roles: ["developer"],
+    icon: icon("M10 10.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 17c0-3 2.7-4.5 6-4.5s6 1.5 6 4.5"),
+    match: (p) => p.startsWith("/employees") || p.startsWith("/sessions"),
+  },
+  {
+    href: "/employees",
+    label: "Employees",
+    roles: ["manager", "administrator"],
+    icon: icon("M7 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM2.5 16c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4M13.5 8.5a2 2 0 1 0 0-4M14 12c2 .3 3.5 1.7 3.5 4"),
+    match: (p) => p.startsWith("/employees") || p.startsWith("/sessions"),
+  },
+  {
+    href: "/connectors",
+    label: "Connectors",
+    roles: ["administrator", "manager", "auditor"],
+    icon: icon("M7 3v4M13 3v4M5.5 7h9v4a4.5 4.5 0 0 1-9 0V7ZM10 15.5V18"),
+  },
+  {
+    href: "/users",
+    label: "Access",
+    roles: ["administrator"],
+    icon: icon("M10 10.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 17c0-3 2.7-4.5 6-4.5s6 1.5 6 4.5"),
+  },
+  {
+    href: "/audit",
+    label: "Audit",
+    roles: ["auditor", "administrator"],
+    icon: icon("M5 3h7l3 3v11H5V3ZM12 3v3h3M7.5 10h5M7.5 13h5"),
+  },
+  {
+    href: "/policy",
+    label: "Policy",
+    roles: ["manager", "administrator", "auditor", "developer"],
+    icon: icon("M10 3 4 5.5v4c0 3.6 2.5 6.6 6 7.5 3.5-.9 6-3.9 6-7.5v-4L10 3Z"),
+  },
 ];
 
-function navActive(path: string, href: string) {
-  if (href === "/") return path === "/";
-  return path === href || path.startsWith(`${href}/`);
-}
-
-function greetingForHour(h: number, name?: string) {
-  const hello =
-    h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-  return name ? `${hello}, ${name}` : hello;
-}
-
-function roleLabel(role?: Role) {
-  if (role === "administrator") return "Admin portal";
-  if (role === "developer") return "Developer portal";
-  if (role === "auditor") return "Auditor portal";
-  return "Manager portal";
+function isActive(path: string, item: NavItem): boolean {
+  if (item.match) return item.match(path);
+  return path === item.href || path.startsWith(`${item.href}/`);
 }
 
 export function AppShell({
   children,
   title,
   subtitle,
+  breadcrumbs,
+  actions,
+  maxWidth = "max-w-[1440px]",
 }: {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
+  breadcrumbs?: React.ReactNode;
+  actions?: React.ReactNode;
+  maxWidth?: string;
 }) {
   const path = usePathname();
   const { user, logout, ready } = useAuth();
-  const mounted = useMounted();
   const [menuOpen, setMenuOpen] = useState(false);
-  const greetingLine = mounted
-    ? greetingForHour(new Date().getHours(), user?.displayName)
-    : user?.displayName
-      ? `Welcome, ${user.displayName}`
-      : "Welcome";
 
   const nav = useMemo(
-    () => ALL_NAV.filter((item) => !user || item.roles.includes(user.role)),
+    () =>
+      NAV.filter((item) => !user || item.roles.includes(user.role)).map((item) =>
+        item.href === "/employees/self" && user?.developerId
+          ? { ...item, href: `/employees/${user.developerId}` }
+          : item,
+      ),
     [user],
   );
 
-  const pathAllowed = useMemo(() => {
-    if (!user) return true;
-    if (path === "/login") return true;
-    if (path.startsWith("/hourly")) {
-      return (
-        user.role === "manager" ||
-        user.role === "administrator" ||
-        user.role === "developer"
-      );
-    }
-    return nav.some((item) => navActive(path, item.href));
-  }, [user, path, nav]);
+  useEffect(() => setMenuOpen(false), [path]);
 
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [path]);
+  if (path === "/login") return <>{children}</>;
 
   if (!ready) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center bg-surface-canvas text-sm text-surface-muted">
-        Loading your portal…
+      <div className="flex h-[100dvh] items-center justify-center bg-canvas">
+        <p className="muted">Loading your workspace…</p>
       </div>
     );
   }
-
-  if (path === "/login") {
-    return <>{children}</>;
-  }
-
   if (!user) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center bg-surface-canvas text-sm text-surface-muted">
-        Redirecting to sign in…
+      <div className="flex h-[100dvh] items-center justify-center bg-canvas">
+        <p className="muted">Redirecting to sign in…</p>
       </div>
     );
   }
 
-  const initials = (user.displayName ?? user.email)
-    .split(" ")
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const sidebarInner = (
+    <>
+      <div className="flex items-center gap-2.5 px-5 py-5">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
+          T
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-ink-900">Techlio</p>
+          <p className="truncate text-2xs text-ink-500">AI activity monitoring</p>
+        </div>
+      </div>
 
-  const sidebar =
-    "flex h-full flex-col bg-gradient-to-b from-ink-950 via-ink-900 to-ink-800 text-slate-100";
+      <nav className="flex-1 space-y-0.5 px-3" aria-label="Main">
+        {nav.map((item) => {
+          const active = isActive(path, item);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                active
+                  ? "bg-brand-50 text-brand-700"
+                  : "text-ink-500 hover:bg-slate-100 hover:text-ink-900"
+              }`}
+            >
+              <span className={active ? "text-brand-600" : "text-ink-400"}>{item.icon}</span>
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
 
-  return (
-    <div className="flex h-[100dvh] overflow-hidden bg-surface-canvas">
-      <aside
-        className={`hidden h-full w-[272px] shrink-0 ${sidebar} md:flex`}
-        aria-label="Main navigation"
-      >
-        <div className="shrink-0 border-b border-white/5 px-5 py-7">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
-              T
-            </div>
-            <p className="text-sm font-semibold tracking-tight text-white">
-              Techlio
-            </p>
-          </div>
-          <h1 className="mt-5 text-xl font-semibold leading-tight text-white">
-            {roleLabel(user.role)}
-          </h1>
-          <p className="mt-2 text-xs text-slate-400">
-            Agent visibility — not timekeeping
+      <div className="border-t border-line p-3">
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-2xs font-semibold uppercase tracking-wide text-ink-500">
+            {ROLE_LABEL[user.role]}
           </p>
-          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-            {portalScopeCopy(user.role)}
+          <p className="mt-1 text-2xs leading-relaxed text-ink-500">
+            {ROLE_SCOPE[user.role]}
           </p>
         </div>
-        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-3">
-          {nav.map((item) => {
-            const active = navActive(path, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`block rounded-lg px-3 py-2.5 transition ${
-                  active
-                    ? "bg-accent/15 text-accent-light ring-1 ring-accent/30"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <span className="block text-sm font-medium">{item.label}</span>
-                <span
-                  className={`block text-xs ${active ? "text-teal-200/80" : "text-slate-500"}`}
-                >
-                  {item.desc}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="shrink-0 border-t border-white/10 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-dark text-sm font-semibold text-white">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{user.displayName}</p>
-              <p className="truncate text-xs text-slate-500">{user.email}</p>
-            </div>
+        <div className="mt-3 flex items-center gap-2.5 px-1">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-2xs font-semibold text-brand-700">
+            {initialsOf(user.displayName)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium text-ink-900">{user.displayName}</p>
+            <p className="truncate text-2xs text-ink-500">{user.email}</p>
           </div>
           <button
             type="button"
             onClick={logout}
-            className="mt-3 w-full rounded-lg border border-white/10 py-2 text-xs text-slate-300 hover:bg-white/5"
+            title="Sign out"
+            aria-label="Sign out"
+            className="btn-quiet h-8"
           >
-            Sign out
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+              <path d="M12 6V4H4v12h8v-2M9 10h8m0 0-2.5-2.5M17 10l-2.5 2.5" />
+            </svg>
           </button>
         </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-[100dvh] bg-canvas">
+      <aside className="sticky top-0 hidden h-[100dvh] w-[232px] shrink-0 flex-col border-r border-line bg-card lg:flex">
+        {sidebarInner}
       </aside>
 
       {menuOpen ? (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal>
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
           <button
             type="button"
-            className="absolute inset-0 bg-ink-950/60 backdrop-blur-sm"
             aria-label="Close menu"
+            className="absolute inset-0 bg-ink-900/40"
             onClick={() => setMenuOpen(false)}
           />
-          <aside className={`absolute left-0 top-0 w-[min(100%,280px)] ${sidebar} shadow-2xl`}>
-            <div className="flex items-center justify-between px-4 py-4">
-              <span className="text-lg font-semibold">{roleLabel(user.role)}</span>
-              <button
-                type="button"
-                className="min-h-[44px] min-w-[44px] text-2xl text-slate-400"
-                onClick={() => setMenuOpen(false)}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <nav className="space-y-0.5 p-3">
-              {nav.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`block rounded-lg px-3 py-3 text-sm font-medium ${
-                    navActive(path, item.href)
-                      ? "bg-accent/15 text-accent-light"
-                      : "text-slate-400"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-            <div className="p-4">
-              <button
-                type="button"
-                onClick={logout}
-                className="w-full rounded-lg border border-white/10 py-2 text-sm"
-              >
-                Sign out
-              </button>
-            </div>
+          <aside className="absolute left-0 top-0 flex h-full w-[260px] flex-col bg-card shadow-pop">
+            {sidebarInner}
           </aside>
         </div>
       ) : null}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-surface-border bg-white/80 px-4 py-4 backdrop-blur-md safe-top sm:px-6 md:px-8">
-          <div className="mb-3 flex items-center justify-between gap-3 md:hidden">
-            <button
-              type="button"
-              className="btn-secondary min-h-[44px] px-3"
-              onClick={() => setMenuOpen(true)}
-            >
-              Menu
-            </button>
-            <span className="text-xs text-surface-muted">{user.displayName}</span>
-          </div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-            {greetingLine}
-          </p>
-          <h2 className="mt-1 text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
-            {title ?? "Overview"}
-          </h2>
-          {subtitle ? (
-            <p className="mt-1 text-sm text-surface-muted">{subtitle}</p>
-          ) : null}
-          <p className="mt-2 text-xs text-slate-400">
-            {roleLabel(user.role)} · {user.displayName}
-          </p>
-        </header>
-        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 safe-bottom sm:px-6 sm:py-6 md:px-8">
-          {pathAllowed ? (
-            children
-          ) : (
-            <div className="card max-w-lg">
-              <h3 className="text-xl font-bold text-ink-900">
-                This view is not in your portal
-              </h3>
-              <p className="mt-2 text-sm text-surface-muted">
-                Your {roleLabel(user.role).toLowerCase()} only includes the
-                pages listed in the sidebar.
-              </p>
-              <Link
-                href="/"
-                className="mt-4 inline-flex min-h-[44px] items-center text-sm font-semibold text-accent hover:text-accent-dark"
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 border-b border-line bg-card/85 backdrop-blur">
+          <div className={`mx-auto w-full ${maxWidth} px-4 py-4 sm:px-6 lg:px-8`}>
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                className="btn-ghost mt-0.5 h-9 w-9 shrink-0 px-0 lg:hidden"
+                aria-label="Open menu"
+                onClick={() => setMenuOpen(true)}
               >
-                Back to overview →
-              </Link>
+                <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M3 6h14M3 10h14M3 14h14" />
+                </svg>
+              </button>
+              <div className="min-w-0 flex-1">
+                {breadcrumbs}
+                <h1 className="h-page truncate">{title ?? "Overview"}</h1>
+                {subtitle ? <p className="muted mt-0.5">{subtitle}</p> : null}
+              </div>
+              {actions ? (
+                <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+              ) : null}
             </div>
-          )}
+          </div>
+        </header>
+
+        <main className={`mx-auto w-full ${maxWidth} flex-1 px-4 py-6 sm:px-6 lg:px-8`}>
+          {children}
         </main>
+
+        <footer className="border-t border-line px-4 py-4 sm:px-6 lg:px-8">
+          <p className="mx-auto max-w-[1440px] text-2xs leading-relaxed text-ink-400">
+            Techlio observes work performed through connected AI coding agents. It is not a
+            timekeeping, payroll, or performance-rating system, and missing telemetry is never
+            evidence of inactivity.
+          </p>
+        </footer>
       </div>
     </div>
   );

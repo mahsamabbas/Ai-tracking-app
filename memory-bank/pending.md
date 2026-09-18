@@ -1,7 +1,7 @@
 # Pending work vs PRD v0.2
 
 Source: [requirements.md](requirements.md).  
-Last reviewed: 2026-09-18 (portal isolation pass).
+Last reviewed: 2026-09-18 (monitoring-product refactor).
 
 ---
 
@@ -40,6 +40,11 @@ Last reviewed: 2026-09-18 (portal isolation pass).
 | FR-027 | **Partial** — in-app health notifications; no email/Slack delivery |
 | FR-028 | **Partial** — CSV + text export (not full PDF layout) |
 
+FR-020/021/022/025/026 are **done**: the employee directory, 30s live polling,
+hourly cards, the full Organisation → Employees → Employee → AI tool → Sessions →
+Session → source-events drill-down, and date/team/tool/activity/project/connector
+filters on every relevant screen.
+
 FR-002/003/004/005 are implemented for the local prototype (RBAC on routes, org-scoped queries, developer self-view, pause → coverage gap).
 
 ---
@@ -57,7 +62,10 @@ FR-002/003/004/005 are implemented for the local prototype (RBAC on routes, org-
 
 ## Tests (§19) — remaining integration
 
-Automated: overlap, secrets, unassigned, provider-missing, timesheet reject, unauthorized developer view, auditor denied timeline, secret scan.
+Automated: interval overlap merge, idle exclusion from the interactive span,
+session classification, null (not zero) token totals, coverage-gap detection,
+date-range resolution, secrets, unassigned, provider-missing, timesheet reject,
+unauthorized developer view, auditor denied timeline, secret scan.
 
 Still need **live integration**: offline connector, long idle, late event E2E, heartbeat stop, pause E2E, replay against API, provider-missing full UI.
 

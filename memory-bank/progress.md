@@ -1,27 +1,51 @@
 # Progress snapshot
 
-**Overall:** MVP **feature-complete for local prototype** on engineering paths including **portal isolation**; **not** production Definition of Done (legal pilot, OIDC, full §19 E2E).
+**Overall:** the monitoring product is complete end-to-end on a local stack —
+data model, analytics API, drill-down UI, role isolation, and realistic connected
+data. **Not** production Definition of Done: legal pilot, SSO, and the §19 live
+integration tests remain.
 
 **Gap list:** [pending.md](pending.md)
 
-## Recently completed (engineering)
+## Delivered in the monitoring refactor
 
-- §14 APIs: register/revoke, heartbeat, projects, work-items, session context, hourly-snapshot detail, activity exports, SSE (`/v1/stream/sse`)
-- Device tokens (hashed), ingest secret rejection + replay id, sessionization tables, coverage gap on pause
-- Late-event recalc queue (API → BullMQ → worker)
-- Hourly metrics: tokens, tests/builds/files, linked event ids
-- Retention job (worker, `RETENTION_DAYS`)
-- Web: filters, export CSV, SSE indicator, hourly drill-down, developer self-view
-- Role-scoped portals: admin users/credentials, developer self-only data, auditor audit log
-- Connector: pause/resume gap events, heartbeat queue depth, extension hook
-- VS Code extension: file save + task context + task completion signals
-- SQL `002_devices_projects_sessions.sql`, `docs/api.md`
+**Data**
+- `employees` table; `agent_sessions` carries precomputed metrics (five
+  durations, idle, counts, models, tool categories, classification, coverage).
+- Real migration runner (`scripts/migrate.mjs` + `schema_migrations`); runtime no
+  longer creates tables on boot.
+- Deterministic 90-day seed for a 12-person org, including the awkward cases the
+  product must handle.
 
-## Still pending (summary)
+**API**
+- `/v1/analytics/organization`, `/v1/analytics/coverage`, `/v1/meta/filters`
+- `/v1/employees`, `/v1/employees/:id`, `/v1/employees/:id/tools/:provider`,
+  `/v1/employees/:id/sessions`, `/v1/sessions/:id`
+- `/v1/dashboard/live` replaces the old `/v1/dashboard/team`: connector states,
+  24h sessions, grouped coverage alerts, recent events.
+- Every analytics endpoint is range-aware and returns period-over-period
+  comparison figures.
+
+**UI**
+- Rebuilt design system: tokens in `globals.css`, `ui/` primitives, `charts/`,
+  `domain/`, `filters/`, shared vocabulary in `lib/vocab.ts`.
+- The six PRD empty states are distinct variants, plus loading skeletons, error
+  with retry, and not-found.
+- Responsive desktop/tablet; sidebar collapses to a drawer below `lg`.
+- Removed: `/developer-day`, `/my-activity`, eleven one-off components, and all
+  browser-side metric computation.
+
+**Tests**
+- 16 unit tests in `@techlio/server-core` covering interval merging, idle
+  exclusion, classification, null token totals, coverage gaps, and range
+  resolution — the §19 scenarios that are testable without a live connector.
+
+## Still pending
 
 - Legal/HR (SEC-007/010), pilot report, Phase 0 live validation
-- Production OIDC/SSO, full multi-tenant RBAC, Ed25519 verify on API
-- Codex/Gemini OTLP, Tier B puller schedule, signed connector binaries
-- FR-024 LLM summaries, FR-027 notifications (rules engine)
+- Production OIDC/SSO, Ed25519 verification at the API
+- FR-024 LLM summaries (deliberately not enabled), FR-027 email/Slack delivery
+- Full PDF export layout
 - TLS, encryption at rest, WCAG audit, Terraform/runbooks
-- Remaining §19 integration tests (offline, idle, late E2E, heartbeat stop, etc.)
+- Live §19 integration: offline queue, long idle, late-event E2E, heartbeat stop,
+  pause E2E, signature replay

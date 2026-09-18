@@ -54,13 +54,15 @@ The local prototype uses JWT sign-in at http://localhost:3000/login (no SSO yet)
 
 | Portal | Person | Email | Password | Lands on |
 |--------|--------|-------|----------|----------|
-| Manager | Faisal | `manager@techlio.local` | `manager123` | `/` Team overview |
-| Developer | Alex | `developer@techlio.local` | `developer123` | `/my-activity` |
-| Developer | Sam | `sam@techlio.local` | `developer123` | `/my-activity` |
-| Administrator | Mahsam | `admin@techlio.local` | `admin123` | `/users` |
+| Manager | Faisal | `manager@techlio.local` | `manager123` | `/` Organisation overview |
+| Developer | Alex Rivera | `developer@techlio.local` | `developer123` | `/employees/<self>` |
+| Developer | Sam Okafor | `sam@techlio.local` | `developer123` | `/employees/<self>` |
+| Administrator | Mahsam | `admin@techlio.local` | `admin123` | `/` Organisation overview |
 | Auditor | Priya | `auditor@techlio.local` | `auditor123` | `/audit` |
 
-**Alex** is the seeded local connector identity (live heartbeats when `pnpm dev` is running). **Sam** exists so you can prove isolation: managers see both; Alex cannot open Sam’s timeline.
+**Alex** is the seeded local connector identity (live heartbeats when `pnpm dev` is running). **Sam** exists so you can prove isolation: managers see both; Alex cannot open Sam’s analytics — the API answers `403`.
+
+A developer's landing page is the *same* employee analytics screen a manager sees, scoped to them. FR-004 asks for parity, not a reduced view.
 
 ### What each role is allowed to do (PRD §4 + current code)
 
@@ -87,11 +89,18 @@ Permission helpers live in `packages/server-core/src/roles.ts` and are enforced 
 cd TechlioTrackingApp
 pnpm install
 docker compose up -d postgres redis
+pnpm db:migrate      # apply infra/sql/*.sql (idempotent, tracked in schema_migrations)
+pnpm db:seed         # 90 days of demo telemetry for a 12-person org
 pnpm build
 pnpm dev
 ```
 
 `pnpm dev` starts **three** processes: API, web, and local connector.
+
+`pnpm db:migrate` is safe to re-run — each file applies once and is recorded in
+`schema_migrations`. `pnpm db:seed` **replaces** generated data (employees,
+devices, sessions, events, snapshots) and leaves identity and audit history
+alone. `pnpm db:reset` runs both.
 
 Optional second terminal (hourly finalize + late recalc + retention):
 
@@ -220,11 +229,49 @@ Scheduled ~**:05 UTC** after each hour:
 
 Today the worker finalizes the **seeded Alex** developer id. Expanding that loop to every developer in the org is a known follow-up.
 
-### 6.4 Dashboard
+### 6.4 Session metrics
 
-- Overview polls every 30s and listens to `GET /v1/stream/sse?access_token=…` (EventSource cannot send `Authorization` headers).
-- Charts are computed in the browser from recent events (`apps/web/src/lib/analytics.ts`).
-- Hourly cards come from `hourly_snapshots`; drill-down loads source events for that hour.
+Every session carries its own precomputed metrics, derived from its events by
+`computeSessionMetrics` (`packages/server-core/src/sessions.ts`) — the single
+source of truth for the §11 rules. It merges overlapping model and tool
+intervals, subtracts idle gaps from the interactive span, counts engineering
+outcomes, and assigns an evidence-based classification:
+
+| Classification | Meaning |
+|----------------|---------|
+| `engineering_output` | Produced test, build, lint, or type-check results |
+| `assisted_editing` | Produced file changes, no checks |
+| `exploration` | Model and tool activity, no file changes |
+| `idle_dominant` | Over half the span had no observed agent activity |
+
+The first three count as "productive agent activity" in the UI. `idle_dominant`
+describes the *telemetry*, and the interface says so explicitly wherever it
+appears (SEC-009).
+
+Metrics are written on ingest and recomputed by the seed. They are columns on
+`agent_sessions`, which is what makes the directory and analytics queries fast
+enough to aggregate 90 days across the org in tens of milliseconds.
+
+### 6.5 Analytics queries
+
+`packages/server-core/src/analytics.ts` holds every aggregate the dashboard
+reads: organisation totals with period-over-period comparison, the employee
+directory, daily trends, tool distribution, hour-of-day and weekday patterns,
+classification splits, tool-category and model breakdowns, project rollups,
+idle periods, and the coverage summary. All of them take the same
+`{ organizationId, developerId?, provider?, team?, projectId? }` scope plus a
+date range, resolved by `resolveRange` (`range.ts`).
+
+### 6.6 Dashboard
+
+- `apps/web` reads the analytics endpoints directly; **no metric is computed in
+  the browser**. `useApi` (`lib/use-api.ts`) gives every screen the same
+  loading / error / empty / data states and optional polling.
+- The organisation overview polls `/v1/dashboard/live` every 30s for connector
+  state and recent sessions. `GET /v1/stream/sse` remains available for
+  push-based clients; polling satisfies the 60-second freshness target.
+- Hourly cards come from `hourly_snapshots`; drill-down loads source events for
+  that hour.
 
 ---
 
@@ -275,19 +322,41 @@ This repo is usually opened in **Cursor**, so the local connector defaults to pr
 
 App: `apps/web` (Next.js 15, App Router, Tailwind). Auth is client-side: JWT in `localStorage` key `techlio-jwt` (`apps/web/src/lib/auth-context.tsx`).
 
+The product is one drill-down path:
+
+```
+Organisation → Employees → Employee → AI tool → Sessions → Session detail
+```
+
 | Route | Who | What you see |
 |-------|-----|----------------|
 | `/login` | Public | Demo portal picker |
-| `/` | Manager, admin, developer | Overview. Manager/admin: full team + export. Developer: own signals only |
-| `/developer-day` | Manager, admin, developer | Hourly cards. Manager/admin pick a developer |
-| `/hourly/[id]` | Manager, admin, developer | Metrics, versions, source events. FR-024 narrative is **not** generated |
-| `/my-activity` | Developer | Own connector, pause/resume, own events |
+| `/` | Manager, admin, developer | Organisation overview: KPIs with period comparison, usage trend, time split, tools, teams, working-hour pattern, coverage, live strip. Developers see the same page scoped to themselves |
+| `/employees` | Manager, admin | Directory: search, team / tool / connector-state filters, sort, usage, productive share, sessions, sparkline |
+| `/employees/[id]` | Manager, admin, self | Employee analytics: totals, trends, time split, AI tool cards, hour and weekday patterns, projects, tool categories, models, idle periods, recent sessions |
+| `/employees/[id]/tools/[provider]` | Manager, admin, self | That employee's use of one AI tool, with the provider's capability limits |
+| `/employees/[id]/sessions` | Manager, admin, self | Paged session history filtered by tool, activity type, and project |
+| `/sessions/[id]` | Manager, admin, self | One session: five durations, usage metrics, task-context versions, full event timeline filtered by activity type |
+| `/hourly/[id]` | Manager, admin, self | Hourly metrics, recalculation versions, source events. FR-024 narrative is **not** generated |
 | `/users` | Admin | List/create portal users |
-| `/connectors` | Admin, manager, auditor | Health. Admin can issue/revoke credentials |
-| `/policy` | All signed-in roles | Collection notice + retention |
+| `/connectors` | Admin, manager, auditor | Health. Admin can pause/resume and revoke credentials |
+| `/policy` | All signed-in roles | Collection notice, retention, and rights |
 | `/audit` | Auditor, admin | Live rows from `audit_log` |
 
-Shell: `apps/web/src/components/AppShell.tsx` — viewport-locked sidebar, scrolling main pane, mobile drawer.
+Shell: `apps/web/src/components/AppShell.tsx` — sticky sidebar on desktop, drawer below `lg`, breadcrumbs at every drill-down level.
+
+**Component layers** (`apps/web/src/components`):
+
+| Folder | Contents |
+|--------|----------|
+| `ui/` | `Card`, `StatTile`, `Badge`, `Tabs`, `Breadcrumbs`, `Callout`, `Pagination`, `InfoDot`, and `States` (loading skeletons, the six required empty variants, error, not-found) |
+| `charts/` | `TrendChart`, `HourPatternChart`, `DonutChart`, `BarList`, `Sparkline`, plus the shared `ChartFrame` that owns axis styling and the empty state |
+| `domain/` | `SessionTable`, `EventTimeline`, `DurationSplit`, `MetricGrid`, `ToolCard`, `AlertList`, and the connector / classification / provider badges |
+| `filters/` | `RangePicker` (today · yesterday · 7d · 30d · 90d · custom), `SelectFilter`, `SearchFilter`, `ActiveFilters` |
+
+Vocabulary shared by all of them lives in `lib/vocab.ts` (connector states,
+classifications, activity types, tool categories) so the same term never gets
+two different labels on two screens.
 
 ---
 
@@ -301,7 +370,15 @@ Base: `http://localhost:3001`. Full table: [api.md](./api.md).
 |--------|------|----------------|
 | POST | `/v1/auth/login` | Public |
 | GET | `/v1/auth/me` | Any signed-in |
-| GET | `/v1/dashboard/team` | All roles (payload scoped) |
+| GET | `/v1/dashboard/live` | All roles (payload scoped) |
+| GET | `/v1/analytics/organization` | Manager, admin, developer (self-scoped) |
+| GET | `/v1/analytics/coverage` | Signed-in |
+| GET | `/v1/meta/filters` | Signed-in |
+| GET | `/v1/employees` | Manager, admin, developer (self only) |
+| GET | `/v1/employees/:id` | Manager, admin, matching developer |
+| GET | `/v1/employees/:id/tools/:provider` | Same as above |
+| GET | `/v1/employees/:id/sessions` | Same as above |
+| GET | `/v1/sessions/:id` | Same as above |
 | GET | `/v1/developers/:id/timeline` | Manager, admin, matching developer |
 | GET | `/v1/hourly-snapshots/:id` | Same as timeline |
 | GET/POST | `/v1/users` | Admin |
@@ -339,14 +416,20 @@ SQL lives in `infra/sql/`. ORM is **Drizzle** in `packages/server-core/src/schem
 | `hourly_snapshots` | Versioned metrics per developer per clock hour |
 | `connector_health` | Last heartbeat, version, queue depth, paused, provider |
 | `devices` | Hashed device tokens, revoke timestamp |
-| `agent_sessions` / `session_context_versions` | Sessions and task-context history |
+| `agent_sessions` / `session_context_versions` | Sessions with precomputed metrics (five durations, counts, models, tool categories, classification, coverage state) and task-context history |
+| `employees` | The monitored people: name, email, team, title, status. `id` **is** the `developer_id` on every event |
 | `projects` / `work_items` | Optional context pick lists |
 | `audit_log` | Login, register, pause, export, user create, ingest counts |
 | `activity_exports` | Generated CSV/text payloads |
 
+`connector_health.demo_state` exists only so seeded connectors keep demonstrating
+the state they were meant to show; real connectors leave it `NULL` and are never
+touched by the demo keepalive.
+
 **There are no timesheet, billing, invoice, or ranking tables.** Do not add them.
 
-Seeded projects: “Techlio Platform”, “Internal Tools”, work item “Activity dashboard MVP”.
+Seeded projects: Techlio Platform, Activity Dashboard, Ingestion Pipeline,
+Mobile App, Infrastructure — with eight work items across them.
 
 ---
 
@@ -366,7 +449,10 @@ Seeded projects: “Techlio Platform”, “Internal Tools”, work item “Acti
 | Screens, charts, portals | `apps/web` |
 | Local queue, redaction, upload | `apps/connector` |
 | Pause / file-save / task context in the IDE | `apps/extension` |
-| SQL | `infra/sql/` |
+| Analytics queries and the employee directory | `packages/server-core/src/analytics.ts` |
+| Session metric rules | `packages/server-core/src/sessions.ts` |
+| Demo data generation | `packages/server-core/src/seed.ts` |
+| SQL and migrations | `infra/sql/` + `scripts/migrate.mjs` |
 | Section 19 tests | `tests/e2e/scenarios/section19.test.ts` |
 | Agent/product memory | `memory-bank/` |
 | Cursor agent rules | `.cursor/rules/` |
@@ -423,7 +509,7 @@ pnpm test
 
 | Layer | What exists |
 |-------|-------------|
-| Unit | Aggregation interval merge, event schema, connector redaction, secret scan |
+| Unit | Session metrics (interval merge, idle exclusion, classification, null token totals, coverage gaps), date-range resolution, aggregation interval merge, event schema, connector redaction, secret scan |
 | E2E package | Overlap durations, secrets, unassigned sessions, timesheet reject, developer cannot view another developer, auditor cannot view timelines |
 | CI | `pnpm build` + `pnpm test` via Turborepo |
 

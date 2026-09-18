@@ -1,76 +1,109 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { useAuth } from "@/lib/auth-context";
-import { fetchAuditLog } from "@/lib/client-api";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
+import { FilterBar, SearchFilter } from "@/components/filters/FilterBar";
+import { useApi } from "@/lib/use-api";
+import { formatDateTime } from "@/lib/format";
 
-type AuditRow = {
+interface AuditEntry {
   id: string;
+  actorId: string | null;
   action: string;
-  actorId?: string | null;
-  detail?: Record<string, unknown> | null;
+  detail: Record<string, unknown> | null;
   createdAt: string;
-};
+}
+
+function toneFor(action: string): "ok" | "warn" | "bad" | "info" | "neutral" {
+  if (action.includes("reject") || action.includes("revoke")) return "bad";
+  if (action.includes("pause") || action.includes("gap")) return "warn";
+  if (action.startsWith("auth")) return "info";
+  if (action.includes("export") || action.includes("create")) return "ok";
+  return "neutral";
+}
 
 export default function AuditPage() {
-  const { token } = useAuth();
-  const [entries, setEntries] = useState<AuditRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const query = useApi<{ entries: AuditEntry[] }>("/v1/audit-log?limit=200");
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    if (!token) return;
-    void fetchAuditLog(token).then(({ ok, json }) => {
-      if (!ok) {
-        setError("Audit history is limited to administrators and auditors.");
-        return;
-      }
-      setEntries(json.entries ?? []);
-    });
-  }, [token]);
+  const entries = (query.data?.entries ?? []).filter((e) =>
+    search
+      ? e.action.toLowerCase().includes(search.toLowerCase()) ||
+        JSON.stringify(e.detail ?? {}).toLowerCase().includes(search.toLowerCase())
+      : true,
+  );
 
   return (
     <AppShell
       title="Audit history"
-      subtitle="Logins, connector credentials, pauses, exports, and policy actions"
+      subtitle="Append-only record of logins, access, configuration, pauses, and exports"
     >
-      {error ? <p className="mb-4 text-sm text-rose-600">{error}</p> : null}
-      <div className="card overflow-hidden p-0">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3">When</th>
-              <th className="px-4 py-3">Action</th>
-              <th className="px-4 py-3">Actor</th>
-              <th className="px-4 py-3">Detail</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {entries.length === 0 ? (
-              <tr>
-                <td className="px-4 py-6 text-slate-500" colSpan={4}>
-                  No audit records yet for this organization.
-                </td>
-              </tr>
-            ) : (
-              entries.map((r) => (
-                <tr key={r.id}>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                    {new Date(r.createdAt).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs">{r.action}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                    {r.actorId ? `${r.actorId.slice(0, 8)}…` : "system"}
-                  </td>
-                  <td className="max-w-sm truncate px-4 py-3 text-xs text-slate-500">
-                    {r.detail ? JSON.stringify(r.detail) : "—"}
-                  </td>
+      <FilterBar>
+        <SearchFilter
+          value={search}
+          onChange={setSearch}
+          placeholder="Filter by action or detail…"
+          width="w-[300px]"
+        />
+      </FilterBar>
+
+      <Card>
+        <CardHeader
+          title="Events"
+          subtitle={`${entries.length} entries · newest first`}
+        />
+        {query.error ? (
+          <ErrorState
+            title="Could not load the audit log"
+            detail={
+              query.status === 403
+                ? "Only auditors and administrators can read the audit log."
+                : query.error
+            }
+            onRetry={query.reload}
+          />
+        ) : query.loading ? (
+          <LoadingBlock rows={8} />
+        ) : entries.length === 0 ? (
+          <EmptyState variant={search ? "no-results" : "no-activity"} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Action</th>
+                  <th>Actor</th>
+                  <th>Detail</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {entries.map((e) => (
+                  <tr key={e.id}>
+                    <td className="num whitespace-nowrap text-sm text-ink-500">
+                      {formatDateTime(e.createdAt)}
+                    </td>
+                    <td>
+                      <Badge tone={toneFor(e.action)}>{e.action}</Badge>
+                    </td>
+                    <td className="num text-xs text-ink-400">
+                      {e.actorId ? e.actorId.slice(0, 8) : "system"}
+                    </td>
+                    <td className="max-w-[420px]">
+                      <code className="block truncate font-mono text-xs text-ink-500">
+                        {e.detail ? JSON.stringify(e.detail) : "—"}
+                      </code>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </AppShell>
   );
 }

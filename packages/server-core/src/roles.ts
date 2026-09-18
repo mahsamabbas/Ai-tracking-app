@@ -67,22 +67,21 @@ export function canViewActivityEvents(user: AuthUser): boolean {
   return user.role !== "auditor";
 }
 
-export function homePathForRole(role: Role): string {
-  if (role === "developer") return "/my-activity";
+/**
+ * Landing route per role. Developers land on their own analytics page, which is
+ * the same surface managers see — FR-004 requires parity, not a reduced view.
+ */
+export function homePathForRole(role: Role, developerId?: string | null): string {
+  if (role === "developer") return developerId ? `/employees/${developerId}` : "/";
   if (role === "auditor") return "/audit";
-  if (role === "administrator") return "/users";
   return "/";
 }
 
 export function navForRole(role: Role): string[] {
-  if (role === "developer") {
-    return ["/", "/my-activity", "/developer-day", "/policy"];
-  }
-  if (role === "auditor") {
-    return ["/audit", "/connectors", "/policy"];
-  }
+  if (role === "developer") return ["/", "/employees/:self", "/policy"];
+  if (role === "auditor") return ["/audit", "/connectors", "/policy"];
   if (role === "administrator") {
-    return ["/", "/users", "/connectors", "/policy", "/audit"];
+    return ["/", "/employees", "/connectors", "/users", "/audit", "/policy"];
   }
-  return ["/", "/developer-day", "/connectors", "/policy"];
+  return ["/", "/employees", "/connectors", "/policy"];
 }

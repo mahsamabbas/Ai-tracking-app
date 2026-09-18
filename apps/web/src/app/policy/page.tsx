@@ -1,114 +1,189 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { useAuth } from "@/lib/auth-context";
-import { fetchOrgPolicy } from "@/lib/client-api";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Callout } from "@/components/ui/Callout";
+import { Badge } from "@/components/ui/Badge";
+import { LoadingBlock } from "@/components/ui/States";
+import { MetricGrid } from "@/components/domain/MetricGrid";
+import { useApi } from "@/lib/use-api";
+
+interface OrgPolicy {
+  organizationId: string;
+  timezone: string;
+  retentionEventsDays: number;
+  retentionSummariesDays: number;
+  staleHeartbeatMinutes: number;
+  idleThresholdMinutes: number;
+  monitoringNoticeStatus: string;
+  notificationRules: string[];
+}
+
+const COLLECTED = [
+  "Session start, end, and heartbeat timestamps",
+  "Model request timing, status, model name, and token totals when the provider reports them",
+  "Tool calls by allowlisted category (file read/write, shell, search, test, build, browser)",
+  "Test, build, lint, and type-check start, end, status, and summarised counts",
+  "File-change metadata: repository-relative path category, change type, timestamp",
+  "Connector health: version, last upload, queue depth, pause state",
+  "The project or work item you select for a session",
+];
+
+const NOT_COLLECTED = [
+  "Prompts and model responses",
+  "Source code or file contents",
+  "Command text and shell output",
+  "Keystrokes and screenshots",
+  "Private messages, browser history, or personal activity",
+  "Secrets, tokens, and environment values — redacted locally and rejected at the server",
+];
 
 export default function PolicyPage() {
-  const { token, user } = useAuth();
-  const [policy, setPolicy] = useState<{
-    timezone?: string;
-    retentionEventsDays?: number;
-    retentionSummariesDays?: number;
-    staleHeartbeatMinutes?: number;
-    monitoringNoticeStatus?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!token) return;
-    void fetchOrgPolicy(token).then(({ json }) => setPolicy(json));
-  }, [token]);
+  const query = useApi<OrgPolicy>("/v1/org/policy");
+  const p = query.data;
 
   return (
     <AppShell
-      title="Collection notice"
-      subtitle="What is monitored — developer transparency (FR-004, SEC-007)"
+      title="Collection policy"
+      subtitle="What this system observes, what it never touches, and how long it keeps it"
     >
-      <div className="prose prose-slate max-w-none space-y-6 text-sm text-slate-700">
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
-          <strong>Draft.</strong> Legal and HR must approve before employee
-          deployment (SEC-010). Status:{" "}
-          {policy?.monitoringNoticeStatus ?? "draft"}.
-        </p>
-
-        <section className="card">
-          <h3 className="text-base font-semibold text-slate-900">Purpose</h3>
-          <p className="mt-2">
-            Operational visibility into activity performed through connected AI
-            coding agents. This is not timekeeping, payroll, or billing approval.
-          </p>
-        </section>
-
-        <section className="card">
-          <h3 className="text-base font-semibold text-slate-900">
-            What we collect
-          </h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Session boundaries and model/tool timing (metadata only)</li>
-            <li>Token totals when the provider exposes them</li>
-            <li>Test, build, and lint outcomes from the connector</li>
-            <li>File-change metadata (paths or categories, not file bodies)</li>
-            <li>Connector health: version, heartbeat, pause state</li>
-          </ul>
-        </section>
-
-        <section className="card">
-          <h3 className="text-base font-semibold text-slate-900">
-            What we do not collect by default
-          </h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Keystrokes, screenshots, or private messages</li>
-            <li>Complete prompts, responses, source files, or shell commands</li>
-            <li>Secrets (redacted locally before upload)</li>
-          </ul>
-        </section>
-
-        <section className="card">
-          <h3 className="text-base font-semibold text-slate-900">
-            Pause and coverage gaps
-          </h3>
-          <p className="mt-2">
-            You may pause collection from the IDE companion or My activity.
-            Pauses appear as coverage gaps — the dashboard will not treat them
-            as proof you were inactive.
-          </p>
-        </section>
-
-        <section className="card">
-          <h3 className="text-base font-semibold text-slate-900">
-            Retention and access
-          </h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>
-              Detailed events: {policy?.retentionEventsDays ?? 90} days
-            </li>
-            <li>
-              Hourly summaries and audit: {policy?.retentionSummariesDays ?? 365}{" "}
-              days
-            </li>
-            <li>Reporting timezone: {policy?.timezone ?? "UTC"}</li>
-            <li>
-              Stale heartbeat: {policy?.staleHeartbeatMinutes ?? 5} minutes
-            </li>
-            <li>
-              Managers see authorized team metadata. Developers see the same
-              records collected about themselves. Auditors see access history
-              and configuration, not timelines.
-            </li>
-          </ul>
-        </section>
-
-        {user?.role === "developer" ? (
-          <Link
-            href="/my-activity"
-            className="inline-flex min-h-[44px] items-center text-indigo-600 hover:underline"
-          >
-            View my activity →
-          </Link>
-        ) : null}
+      <div className="mb-5">
+        <Callout tone="info" title="Scope boundary">
+          This system observes work performed through connected AI coding agents. It does not
+          accept developer-submitted hours, compare activity with timesheets, estimate total human
+          effort, approve billing, or rank people. Low observed AI usage is not evidence of low
+          effort — planning, meetings, review, and manual coding are invisible to it.
+        </Callout>
       </div>
+
+      {query.loading || !p ? (
+        <Card>
+          <LoadingBlock rows={5} />
+        </Card>
+      ) : (
+        <>
+          <Card className="mb-5">
+            <CardHeader
+              title="Current configuration"
+              subtitle="Applied to every aggregate on every screen"
+              action={
+                <Badge tone={p.monitoringNoticeStatus === "approved" ? "ok" : "warn"}>
+                  Notice: {p.monitoringNoticeStatus}
+                </Badge>
+              }
+            />
+            <CardBody>
+              <MetricGrid
+                columns={5}
+                metrics={[
+                  {
+                    label: "Reporting timezone",
+                    value: p.timezone,
+                    help: "Hour labels use this timezone; every event timestamp is stored in UTC.",
+                  },
+                  {
+                    label: "Idle threshold",
+                    value: `${p.idleThresholdMinutes} min`,
+                    help: "Gaps longer than this are excluded from the interactive session span.",
+                  },
+                  {
+                    label: "Stale heartbeat",
+                    value: `${p.staleHeartbeatMinutes} min`,
+                    help: "A connector that has not checked in for this long is marked stale and raises a coverage warning.",
+                  },
+                  {
+                    label: "Event retention",
+                    value: `${p.retentionEventsDays} days`,
+                    help: "Detailed events are purged after this period.",
+                  },
+                  {
+                    label: "Summary retention",
+                    value: `${p.retentionSummariesDays} days`,
+                    help: "Hourly summaries and audit records are kept longer than raw events.",
+                  },
+                ]}
+              />
+            </CardBody>
+          </Card>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Card>
+              <CardHeader title="What is collected" subtitle="Allowlisted metadata only" />
+              <CardBody>
+                <ul className="space-y-2">
+                  {COLLECTED.map((item) => (
+                    <li key={item} className="flex gap-2.5 text-sm text-ink-700">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader title="What is never collected" subtitle="Disabled by default and rejected at ingest" />
+              <CardBody>
+                <ul className="space-y-2">
+                  {NOT_COLLECTED.map((item) => (
+                    <li key={item} className="flex gap-2.5 text-sm text-ink-700">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            </Card>
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <Card>
+              <CardHeader title="Your rights" subtitle="Available to every monitored person" />
+              <CardBody>
+                <ul className="space-y-2.5 text-sm text-ink-700">
+                  <li>
+                    <span className="font-medium text-ink-900">See your own data.</span> You can view
+                    exactly the events, sessions, and summaries collected about you — the same
+                    records a manager can review.
+                  </li>
+                  <li>
+                    <span className="font-medium text-ink-900">Pause collection.</span> Pausing
+                    records a visible coverage gap instead of silently dropping data, and is never
+                    presented as evidence of inactivity.
+                  </li>
+                  <li>
+                    <span className="font-medium text-ink-900">Leave a session unassigned.</span>{" "}
+                    Activity without a project stays explicitly labelled “no task selected” and is
+                    never silently attributed elsewhere.
+                  </li>
+                  <li>
+                    <span className="font-medium text-ink-900">Dispute a record.</span> Corrections
+                    are versioned; earlier snapshots are retained with the reason for change.
+                  </li>
+                </ul>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader title="Health notifications" subtitle="Data-quality conditions only" />
+              <CardBody>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.notificationRules.map((r) => (
+                    <Badge key={r} tone="neutral">
+                      {r.replace(/_/g, " ")}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="hint mt-3">
+                  Notifications cover telemetry reliability — stale connectors, upload failures,
+                  unsupported versions, prolonged unassigned activity, and summary-generation
+                  failures. There are no alerts about a person&apos;s output.
+                </p>
+              </CardBody>
+            </Card>
+          </div>
+        </>
+      )}
     </AppShell>
   );
 }
