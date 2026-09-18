@@ -7,6 +7,7 @@ import { AlertBanner } from "@/components/AlertBanner";
 import { StatCard } from "@/components/StatCard";
 import { API_BASE, DEV_ID } from "@/lib/api";
 import type { HourlySnapshot } from "@/lib/types";
+import { CapabilityBanner } from "@/components/CapabilityBanner";
 import { formatDuration } from "@/lib/analytics";
 import {
   Bar,
@@ -59,11 +60,14 @@ export default function DeveloperDayPage() {
       {error ? (
         <AlertBanner variant="warning" title={error} />
       ) : cards.length === 0 ? (
-        <AlertBanner
-          variant="info"
-          title="No hourly summaries yet"
-          detail="The worker finalizes each hour at :05 UTC after events exist in Postgres."
-        />
+        <>
+          <CapabilityBanner provider="cursor" />
+          <AlertBanner
+            variant="info"
+            title="No hourly summaries yet"
+            detail="Cursor does not expose hourly agent sessions. The worker can still finalize an hour from companion file/task events, but model and tool duration stay 'not available from provider'."
+          />
+        </>
       ) : null}
 
       {cards.length > 0 && (

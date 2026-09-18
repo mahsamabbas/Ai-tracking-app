@@ -15,7 +15,7 @@ export async function uploadBatch(
       "Content-Type": "application/json",
       Authorization: `Bearer ${deviceToken}`,
       "X-Signature": signature,
-      "X-Idempotency-Key": events[0]?.event_id ?? "",
+      "X-Device-Id": events[0]?.device_id ?? "",
     },
     body,
   });

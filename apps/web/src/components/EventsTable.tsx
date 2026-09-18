@@ -1,5 +1,6 @@
 import type { ActivityEventRow } from "@/lib/types";
 import { formatTime } from "@/lib/analytics";
+import { providerLabel } from "@/lib/providers";
 
 export function EventsTable({ events }: { events: ActivityEventRow[] }) {
   if (events.length === 0) {
@@ -37,7 +38,9 @@ export function EventsTable({ events }: { events: ActivityEventRow[] }) {
                 <td className="px-5 py-3 font-mono text-xs text-indigo-700">
                   {e.event_type ?? "—"}
                 </td>
-                <td className="px-5 py-3 text-slate-700">{e.provider ?? "—"}</td>
+                <td className="px-5 py-3 text-slate-700">
+                  {providerLabel(e.provider)}
+                </td>
                 <td className="px-5 py-3">
                   <span className="badge-muted">{e.status ?? "—"}</span>
                 </td>

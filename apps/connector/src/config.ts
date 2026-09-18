@@ -9,7 +9,9 @@ export const config = {
     process.env.TECHLIO_DEVICE_ID ?? "550e8400-e29b-41d4-a716-446655440012",
   consentVersion: process.env.TECHLIO_CONSENT_VERSION ?? "1",
   connectorVersion: "0.1.0",
-  provider: "claude_code",
+  /** Host agent. Cursor is the local IDE; override with TECHLIO_PROVIDER. */
+  provider: process.env.TECHLIO_PROVIDER ?? "cursor",
   dbPath: process.env.CONNECTOR_DB ?? ".techlio-connector/queue.db",
   signingKeyHex: process.env.CONNECTOR_SIGNING_KEY_HEX,
+  deviceToken: process.env.TECHLIO_DEVICE_TOKEN ?? "dev-device-token",
 };

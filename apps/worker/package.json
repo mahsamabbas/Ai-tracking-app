@@ -10,6 +10,7 @@
     "lint": "echo ok"
   },
   "dependencies": {
+    "@techlio/puller": "workspace:*",
     "@techlio/server-core": "workspace:*",
     "bullmq": "^5.34.5",
     "ioredis": "^5.4.2"

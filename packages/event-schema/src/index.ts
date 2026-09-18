@@ -1,5 +1,6 @@
 export * from "./catalog.js";
 export * from "./event.js";
+export * from "./providers.js";
 export { zodToJsonSchema } from "zod-to-json-schema";
 import { ActivityEventSchema } from "./event.js";
 import { zodToJsonSchema } from "zod-to-json-schema";

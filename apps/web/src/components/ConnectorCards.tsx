@@ -1,5 +1,6 @@
 import type { ConnectorRow } from "@/lib/types";
 import { formatTime } from "@/lib/analytics";
+import { providerLabel, providerMeta } from "@/lib/providers";
 
 function isStale(last?: string) {
   if (!last) return true;
@@ -28,14 +29,26 @@ export function ConnectorCards({ connectors }: { connectors: ConnectorRow[] }) {
         const last = c.lastHeartbeat ?? c.last_heartbeat;
         const stale = isStale(last);
         const paused = (c.paused ?? 0) > 0;
+        const provider = c.provider;
+        const meta = providerMeta(provider);
         return (
           <div key={id} className="card">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-xs font-medium uppercase text-slate-500">
-                  Device
+                  Provider
                 </p>
-                <p className="font-mono text-sm text-slate-800">{id.slice(0, 18)}…</p>
+                <p className="text-sm font-semibold text-slate-800">
+                  {providerLabel(provider)}
+                  {meta ? (
+                    <span className="ml-2 text-xs font-normal text-slate-500">
+                      Tier {meta.tier}
+                    </span>
+                  ) : null}
+                </p>
+                <p className="mt-1 font-mono text-xs text-slate-500">
+                  {id.slice(0, 18)}…
+                </p>
               </div>
               {paused ? (
                 <span className="badge-warn">Paused</span>

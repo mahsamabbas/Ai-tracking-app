@@ -1,4 +1,5 @@
 import type { ActivityEventRow } from "./types";
+import { providerLabel } from "./providers";
 
 export function eventsByType(events: ActivityEventRow[]) {
   const map = new Map<string, number>();
@@ -24,18 +25,29 @@ export function eventsByHour(events: ActivityEventRow[]) {
     const key = `${i.toString().padStart(2, "0")}:00`;
     return { hour: key, events: map.get(key) ?? 0 };
   });
-  return hours.filter((h) => h.events > 0).length > 0
-    ? hours.filter((h) => parseInt(h.hour, 10) >= 6)
-    : hours.slice(8, 20);
+  return hours;
 }
 
 export function providerSplit(events: ActivityEventRow[]) {
+  const skip = new Set([
+    "heartbeat_sent",
+    "connector_started",
+    "connector_stopped",
+    "connector_paused",
+    "connector_resumed",
+  ]);
+  const agentEvents = events.filter((e) => !skip.has(e.event_type ?? ""));
+  const source = agentEvents.length > 0 ? agentEvents : events;
   const map = new Map<string, number>();
-  for (const e of events) {
+  for (const e of source) {
     const p = e.provider ?? "unknown";
     map.set(p, (map.get(p) ?? 0) + 1);
   }
-  return [...map.entries()].map(([name, value]) => ({ name, value }));
+  return [...map.entries()].map(([name, value]) => ({
+    name: providerLabel(name),
+    id: name,
+    value,
+  }));
 }
 
 export function formatDuration(ms?: number) {

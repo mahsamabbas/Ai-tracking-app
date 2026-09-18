@@ -23,9 +23,9 @@ export function AppShell({
   const path = usePathname();
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-64 flex-shrink-0 border-r border-slate-200 bg-slate-900 text-slate-100 md:flex md:flex-col">
-        <div className="border-b border-slate-700 px-5 py-6">
+    <div className="flex h-screen overflow-hidden">
+      <aside className="hidden h-screen w-64 shrink-0 flex-col overflow-hidden border-r border-slate-800 bg-slate-900 text-slate-100 md:flex">
+        <div className="shrink-0 border-b border-slate-700 px-5 py-6">
           <p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
             Techlio
           </p>
@@ -36,9 +36,12 @@ export function AppShell({
             Agent visibility — not timekeeping
           </p>
         </div>
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {NAV.map((item) => {
-            const active = path === item.href;
+            const active =
+              item.href === "/"
+                ? path === "/"
+                : path === item.href || path.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.href}
@@ -59,13 +62,30 @@ export function AppShell({
             );
           })}
         </nav>
-        <div className="border-t border-slate-700 p-4 text-xs text-slate-500">
+        <div className="shrink-0 border-t border-slate-700 p-4 text-xs text-slate-500">
           Live: SSE + 30s poll on overview
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-slate-200 bg-white px-6 py-5 md:px-8">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-5 md:px-8">
+          <div className="md:hidden">
+            <nav className="mb-3 flex gap-2 overflow-x-auto text-sm">
+              {NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`shrink-0 rounded-full px-3 py-1 ${
+                    path === item.href
+                      ? "bg-indigo-600 text-white"
+                      : "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
             {title ?? "Overview"}
           </h2>
@@ -73,7 +93,9 @@ export function AppShell({
             <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
           ) : null}
         </header>
-        <main className="flex-1 px-6 py-6 md:px-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto px-6 py-6 md:px-8">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -1,8 +1,10 @@
 import { Queue, Worker } from "bullmq";
 import {
   finalizeHourForDeveloper,
+  ingestBatch,
   purgeEventsOlderThan,
 } from "@techlio/server-core";
+import { cursorRowToEvent, fetchCursorDailyUsage } from "@techlio/puller";
 
 const connection = {
   host: process.env.REDIS_HOST ?? "localhost",
@@ -11,7 +13,9 @@ const connection = {
 
 const ORG = "550e8400-e29b-41d4-a716-446655440010";
 const DEV = "550e8400-e29b-41d4-a716-446655440011";
+const DEVICE = "550e8400-e29b-41d4-a716-446655440012";
 const RETENTION_DAYS = Number(process.env.RETENTION_DAYS ?? 90);
+const CURSOR_API_KEY = process.env.CURSOR_API_KEY;
 
 const hourlyQueue = new Queue("hourly-finalize", { connection });
 
@@ -72,5 +76,36 @@ async function runRetention(): Promise<void> {
 
 setInterval(() => void runRetention(), 24 * 60 * 60 * 1000);
 
+async function pullCursorDaily(): Promise<void> {
+  if (!CURSOR_API_KEY) {
+    console.log(
+      "Cursor Tier B puller idle — set CURSOR_API_KEY to ingest Admin API daily usage",
+    );
+    return;
+  }
+  const end = Date.now();
+  const start = end - 24 * 60 * 60 * 1000;
+  try {
+    const rows = await fetchCursorDailyUsage(CURSOR_API_KEY, start, end);
+    const events = rows.map((row) =>
+      cursorRowToEvent(row, {
+        organizationId: ORG,
+        developerId: DEV,
+        deviceId: DEVICE,
+        connectorVersion: "0.1.0",
+        consentVersion: "1",
+      }),
+    );
+    if (events.length === 0) return;
+    const result = await ingestBatch(ORG, { events });
+    console.log("Cursor daily pull", result);
+  } catch (err) {
+    console.warn("Cursor daily pull failed", err);
+  }
+}
+
+void pullCursorDaily();
+setInterval(() => void pullCursorDaily(), 60 * 60 * 1000);
+
 scheduleNextHourly();
-console.log("Worker started (hourly finalize, recalc, retention)");
+console.log("Worker started (hourly finalize, recalc, retention, Cursor puller)");

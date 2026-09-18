@@ -74,4 +74,5 @@ export const connectorHealth = pgTable("connector_health", {
   version: text("version"),
   queueDepth: integer("queue_depth"),
   paused: integer("paused").default(0),
+  provider: text("provider"),
 });

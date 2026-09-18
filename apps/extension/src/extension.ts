@@ -3,16 +3,32 @@ import * as vscode from "vscode";
 const CONNECTOR = "http://127.0.0.1:9477";
 const SESSION_ID = globalThis.crypto.randomUUID();
 
-async function postExtensionEvent(body: Record<string, unknown>): Promise<void> {
+function hostProvider(): string {
+  const name = vscode.env.appName.toLowerCase();
+  if (name.includes("cursor")) return "cursor";
+  if (name.includes("visual studio code")) return "vscode";
+  return "cursor";
+}
+
+async function postJson(path: string, body: Record<string, unknown>): Promise<void> {
   try {
-    await fetch(`${CONNECTOR}/hooks/extension`, {
+    await fetch(`${CONNECTOR}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: SESSION_ID, ...body }),
+      body: JSON.stringify(body),
     });
   } catch {
-    /* connector offline */
+    /* connector offline — queue on next retry when it is up */
   }
+}
+
+async function postExtensionEvent(body: Record<string, unknown>): Promise<void> {
+  await postJson("/hooks/extension", {
+    session_id: SESSION_ID,
+    provider: hostProvider(),
+    appName: vscode.env.appName,
+    ...body,
+  });
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -20,8 +36,14 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.StatusBarAlignment.Left,
     100,
   );
-  status.text = "Techlio: collecting";
+  status.text = `Techlio: ${hostProvider()}`;
   status.show();
+
+  void postJson("/host", {
+    provider: hostProvider(),
+    appName: vscode.env.appName,
+  });
+  void postExtensionEvent({ event_type: "session_started" });
 
   context.subscriptions.push(
     vscode.commands.registerCommand("techlio.pauseCollection", async () => {
@@ -33,7 +55,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("techlio.resumeCollection", async () => {
       await fetch(`${CONNECTOR}/resume`, { method: "POST" });
-      status.text = "Techlio: collecting";
+      status.text = `Techlio: ${hostProvider()}`;
     }),
   );
 
@@ -72,7 +94,6 @@ export function activate(context: vscode.ExtensionContext) {
       if (eventType) {
         void postExtensionEvent({
           event_type: eventType,
-          metadata: { tool_name: e.execution.task.name.slice(0, 128) },
         });
       }
     }),

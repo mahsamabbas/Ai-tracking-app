@@ -8,4 +8,8 @@ const pool = new pg.Pool({
     "postgres://techlio:techlio@localhost:5432/techlio_activity",
 });
 
+pool.query(`ALTER TABLE connector_health ADD COLUMN IF NOT EXISTS provider TEXT`).catch(() => {
+  /* table may not exist yet on first boot */
+});
+
 export const db = drizzle(pool, { schema });

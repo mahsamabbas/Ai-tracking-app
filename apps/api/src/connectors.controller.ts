@@ -54,6 +54,7 @@ export class ConnectorsController {
       version?: string;
       queueDepth?: number;
       paused?: boolean;
+      provider?: string;
       capabilities?: Record<string, unknown>;
     },
   ) {
@@ -71,6 +72,7 @@ export class ConnectorsController {
         version: body.version ?? "unknown",
         queueDepth: body.queueDepth ?? 0,
         paused: body.paused ? 1 : 0,
+        provider: body.provider ?? null,
       })
       .onConflictDoUpdate({
         target: connectorHealth.deviceId,
@@ -79,6 +81,7 @@ export class ConnectorsController {
           version: body.version ?? "unknown",
           queueDepth: body.queueDepth ?? 0,
           paused: body.paused ? 1 : 0,
+          provider: body.provider ?? null,
         },
       });
 

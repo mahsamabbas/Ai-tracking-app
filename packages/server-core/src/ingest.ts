@@ -154,6 +154,7 @@ export async function ingestBatch(
             version: event.connector_version,
             queueDepth: event.metadata?.queue_depth ?? 0,
             paused: paused ?? 0,
+            provider: event.provider,
           })
           .onConflictDoUpdate({
             target: connectorHealth.deviceId,
@@ -161,6 +162,7 @@ export async function ingestBatch(
               lastHeartbeat: new Date(),
               version: event.connector_version,
               queueDepth: event.metadata?.queue_depth ?? 0,
+              provider: event.provider,
               ...(paused !== undefined ? { paused } : {}),
             },
           });

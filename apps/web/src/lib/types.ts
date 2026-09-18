@@ -19,6 +19,7 @@ export type ConnectorRow = {
   queueDepth?: number;
   queue_depth?: number;
   paused?: number;
+  provider?: string;
 };
 
 export type TeamResponse = {

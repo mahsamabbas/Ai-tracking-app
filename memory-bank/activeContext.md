@@ -2,6 +2,8 @@
 
 **Date:** 2026-09-18
 
+**Fixes:** Sidebar is viewport-locked (main pane scrolls). Provider is the host IDE (Cursor by default), not hardcoded Claude Code. Cursor is Tier B — hourly model/tool metrics show the PRD empty state.
+
 **Phase:** Local MVP stack implemented; legal pilot and production hardening remain.
 
 **Local run:**

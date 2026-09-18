@@ -11,6 +11,7 @@ import {
 } from "@/components/ActivityCharts";
 import { EventsTable } from "@/components/EventsTable";
 import { ConnectorCards } from "@/components/ConnectorCards";
+import { CapabilityBanner } from "@/components/CapabilityBanner";
 import { API_BASE, createExport, fetchTeamDashboard, streamUrl } from "@/lib/api";
 import type { TeamResponse, ActivityEventRow } from "@/lib/types";
 import {
@@ -18,6 +19,7 @@ import {
   eventsByType,
   providerSplit,
 } from "@/lib/analytics";
+import { providerLabel } from "@/lib/providers";
 
 export default function HomePage() {
   const [data, setData] = useState<TeamResponse | null>(null);
@@ -103,12 +105,17 @@ export default function HomePage() {
     if (!last) return false;
     return Date.now() - new Date(last).getTime() < 5 * 60 * 1000;
   }).length;
+  const primaryProvider =
+    connectors.find((c) => c.provider)?.provider ??
+    events.find((e) => e.provider)?.provider;
 
   return (
     <AppShell
       title="Team overview"
       subtitle="Near-live connector status and agent-visible activity"
     >
+      <CapabilityBanner provider={primaryProvider} />
+
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <label className="text-sm text-slate-600">
           Event type
@@ -118,19 +125,27 @@ export default function HomePage() {
             onChange={(e) =>
               setFilters((f) => ({ ...f, eventType: e.target.value }))
             }
-            placeholder="e.g. heartbeat_sent"
+            placeholder="All types"
           />
         </label>
         <label className="text-sm text-slate-600">
           Provider
-          <input
+          <select
             className="ml-2 rounded border border-slate-300 px-2 py-1 text-sm"
             value={filters.provider}
             onChange={(e) =>
               setFilters((f) => ({ ...f, provider: e.target.value }))
             }
-            placeholder="claude_code"
-          />
+          >
+            <option value="">All providers</option>
+            {["cursor", "claude_code", "codex", "gemini", "github_copilot"].map(
+              (id) => (
+                <option key={id} value={id}>
+                  {providerLabel(id)}
+                </option>
+              ),
+            )}
+          </select>
         </label>
         <button
           type="button"

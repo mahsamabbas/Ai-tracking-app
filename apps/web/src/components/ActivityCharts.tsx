@@ -27,7 +27,7 @@ export function EventsTimelineChart({
   return (
     <div className="card h-[280px]">
       <h3 className="text-sm font-semibold text-slate-800">Events by hour</h3>
-      <p className="text-xs text-slate-500">Current day (UTC hours)</p>
+      <p className="text-xs text-slate-500">Current day (local hours)</p>
       {!hasData ? (
         <p className="mt-12 text-center text-sm text-slate-400">
           No events yet — connect an agent or send a test batch

@@ -158,6 +158,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@techlio/puller':
+        specifier: workspace:*
+        version: link:../../packages/puller
       '@techlio/server-core':
         specifier: workspace:*
         version: link:../../packages/server-core
