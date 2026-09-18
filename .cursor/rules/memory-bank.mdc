@@ -1,0 +1,17 @@
+---
+description: Read memory bank before implementing features for Techlio AI Activity Dashboard
+alwaysApply: true
+---
+
+# Memory bank
+
+Before planning or coding in this repo, read:
+
+1. `memory-bank/projectbrief.md`
+2. `memory-bank/productContext.md`
+3. `memory-bank/techContext.md`
+4. `memory-bank/systemPatterns.md`
+5. `memory-bank/activeContext.md`
+6. `memory-bank/progress.md`
+
+Full PRD text: `memory-bank/requirements.md`

@@ -1,0 +1,12 @@
+---
+description: Hard privacy and scope constraints from PRD v0.2
+alwaysApply: true
+---
+
+# Privacy guardrails
+
+- Never add timesheet, billing, invoice, payroll, or developer-ranking features.
+- Never store raw prompts, responses, source file bodies, command text, keystrokes, or screenshots in events or logs by default.
+- Metadata must be **allowlist-only** (see `@techlio/event-schema` MetadataSchema).
+- Missing telemetry must not be shown as zero activity — use explicit empty states (offline, paused, provider missing, delayed).
+- Wording: "the agent performed" not "the developer worked" in generated summaries.

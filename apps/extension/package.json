@@ -1,0 +1,25 @@
+{
+  "name": "techlio-activity-companion",
+  "displayName": "Techlio AI Activity Companion",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "techlio.pauseCollection", "title": "Techlio: Pause collection" },
+      { "command": "techlio.resumeCollection", "title": "Techlio: Resume collection" },
+      { "command": "techlio.setTaskContext", "title": "Techlio: Set task context" }
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "echo ok"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.96.0",
+    "typescript": "^5.7.2"
+  }
+}
