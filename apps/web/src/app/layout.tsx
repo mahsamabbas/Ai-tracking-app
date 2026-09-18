@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Techlio AI Activity",
@@ -12,16 +13,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ fontFamily: "system-ui", margin: 0, padding: 24 }}>
-        <header style={{ marginBottom: 24 }}>
-          <h1 style={{ margin: 0 }}>AI Agent Activity Dashboard</h1>
-          <p style={{ color: "#555" }}>
-            Operational visibility through connected AI coding agents — not
-            timekeeping.
-          </p>
-        </header>
-        {children}
-      </body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }
