@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { AlertBanner } from "@/components/AlertBanner";
@@ -109,7 +110,17 @@ export default function DeveloperDayPage() {
                     ? new Date(hourLabel as string).toLocaleString()
                     : `Hour ${i + 1}`}
                 </h3>
-                <span className="badge-muted">v{c.version ?? 1}</span>
+                <div className="flex items-center gap-2">
+                  <span className="badge-muted">v{c.version ?? 1}</span>
+                  {c.id ? (
+                    <Link
+                      href={`/hourly/${c.id}`}
+                      className="text-xs font-medium text-indigo-600 hover:underline"
+                    >
+                      Drill down
+                    </Link>
+                  ) : null}
+                </div>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {[

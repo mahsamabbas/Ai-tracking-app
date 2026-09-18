@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { mergeIntervals, totalDurationMs } from "@techlio/aggregation";
 import { ActivityEventSchema, EventTypes } from "@techlio/event-schema";
+import { scanEventForSecrets } from "@techlio/server-core";
+import { canViewDeveloper } from "../../../apps/api/src/auth/roles.js";
 function containsSecret(value: string): boolean {
   return /ghp_[a-zA-Z0-9]{20,}/.test(value);
 }
@@ -41,6 +43,28 @@ describe("Section 19 required scenarios", () => {
   it("provider lacks token data — optional fields", () => {
     const parsed = ActivityEventSchema.parse(baseEvent);
     expect(parsed.metadata?.token_input).toBeUndefined();
+  });
+
+  it("unauthorized manager cannot view other developer (developer role)", () => {
+    const ok = canViewDeveloper(
+      {
+        id: "d1",
+        organizationId: "550e8400-e29b-41d4-a716-446655440010",
+        role: "developer",
+        developerId: "550e8400-e29b-41d4-a716-446655440011",
+      },
+      "550e8400-e29b-41d4-a716-446655440099",
+    );
+    expect(ok).toBe(false);
+  });
+
+  it("replayed event id rejected by server-core secret scan", () => {
+    expect(scanEventForSecrets({ metadata: { tool_name: "safe" } })).toBeNull();
+    expect(
+      scanEventForSecrets({
+        metadata: { tool_name: "ghp_abcdefghijklmnopqrstuvwxyz123456" },
+      }),
+    ).toBeTruthy();
   });
 
   it("timesheet import endpoint not supported", async () => {

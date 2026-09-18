@@ -5,8 +5,10 @@ import {
   NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 import { AppModule } from "./app.module.js";
+import { initRecalcQueue } from "./services/recalc-queue.js";
 
 async function bootstrap() {
+  initRecalcQueue();
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),

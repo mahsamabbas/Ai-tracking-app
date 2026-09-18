@@ -11,7 +11,7 @@ import {
 } from "@/components/ActivityCharts";
 import { EventsTable } from "@/components/EventsTable";
 import { ConnectorCards } from "@/components/ConnectorCards";
-import { API_BASE, fetchTeamDashboard } from "@/lib/api";
+import { API_BASE, createExport, fetchTeamDashboard, streamUrl } from "@/lib/api";
 import type { TeamResponse, ActivityEventRow } from "@/lib/types";
 import {
   eventsByHour,
@@ -22,6 +22,11 @@ import {
 export default function HomePage() {
   const [data, setData] = useState<TeamResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    eventType: "",
+    provider: "",
+  });
+  const [liveAt, setLiveAt] = useState<string | null>(null);
   const [banner, setBanner] = useState<{
     variant: "error" | "warning" | "info";
     title: string;
@@ -31,7 +36,10 @@ export default function HomePage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const { ok, status, json } = await fetchTeamDashboard();
+        const { ok, status, json } = await fetchTeamDashboard({
+          eventType: filters.eventType || undefined,
+          provider: filters.provider || undefined,
+        });
         const team: TeamResponse = {
           connectors: Array.isArray(json.connectors) ? json.connectors : [],
           recentEvents: Array.isArray(json.recentEvents)
@@ -73,6 +81,19 @@ export default function HomePage() {
     load();
     const id = setInterval(load, 30_000);
     return () => clearInterval(id);
+  }, [filters.eventType, filters.provider]);
+
+  useEffect(() => {
+    const es = new EventSource(streamUrl());
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data) as { at?: string };
+        if (data.at) setLiveAt(data.at);
+      } catch {
+        /* ignore */
+      }
+    };
+    return () => es.close();
   }, []);
 
   const events = (data?.recentEvents ?? []) as ActivityEventRow[];
@@ -88,6 +109,49 @@ export default function HomePage() {
       title="Team overview"
       subtitle="Near-live connector status and agent-visible activity"
     >
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <label className="text-sm text-slate-600">
+          Event type
+          <input
+            className="ml-2 rounded border border-slate-300 px-2 py-1 text-sm"
+            value={filters.eventType}
+            onChange={(e) =>
+              setFilters((f) => ({ ...f, eventType: e.target.value }))
+            }
+            placeholder="e.g. heartbeat_sent"
+          />
+        </label>
+        <label className="text-sm text-slate-600">
+          Provider
+          <input
+            className="ml-2 rounded border border-slate-300 px-2 py-1 text-sm"
+            value={filters.provider}
+            onChange={(e) =>
+              setFilters((f) => ({ ...f, provider: e.target.value }))
+            }
+            placeholder="claude_code"
+          />
+        </label>
+        <button
+          type="button"
+          className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700"
+          onClick={() =>
+            void createExport("csv").then((r) => {
+              if (r.downloadUrl) {
+                window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
+              }
+            })
+          }
+        >
+          Export CSV
+        </button>
+        {liveAt ? (
+          <span className="text-xs text-emerald-700">
+            SSE live · {new Date(liveAt).toLocaleTimeString()}
+          </span>
+        ) : null}
+      </div>
+
       {banner ? (
         <AlertBanner
           variant={banner.variant}

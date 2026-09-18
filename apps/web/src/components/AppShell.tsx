@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV = [
   { href: "/", label: "Overview", desc: "Team & live signals" },
   { href: "/developer-day", label: "Developer day", desc: "Hourly timeline" },
+  { href: "/my-activity", label: "My activity", desc: "Developer self-view" },
   { href: "/connectors", label: "Connectors", desc: "Health & versions" },
   { href: "/audit", label: "Audit", desc: "Access & policy" },
 ];
@@ -59,7 +60,7 @@ export function AppShell({
           })}
         </nav>
         <div className="border-t border-slate-700 p-4 text-xs text-slate-500">
-          Refreshes every 30s on overview
+          Live: SSE + 30s poll on overview
         </div>
       </aside>
 

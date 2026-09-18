@@ -35,6 +35,9 @@ export const MetadataSchema = z
     test_failed: z.number().int().nonnegative().optional(),
     tier: z.enum(["A", "B"]).optional(),
     daily_only: z.boolean().optional(),
+    queue_depth: z.number().int().nonnegative().optional(),
+    connector_paused: z.boolean().optional(),
+    gap_reason: z.enum(["paused", "offline", "heartbeat_missing"]).optional(),
   })
   .strict();
 

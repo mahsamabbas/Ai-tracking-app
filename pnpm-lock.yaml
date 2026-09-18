@@ -32,9 +32,15 @@ importers:
       '@noble/ed25519':
         specifier: ^2.2.3
         version: 2.3.0
+      '@techlio/event-schema':
+        specifier: workspace:*
+        version: link:../../packages/event-schema
       '@techlio/server-core':
         specifier: workspace:*
         version: link:../../packages/server-core
+      bullmq:
+        specifier: ^5.34.5
+        version: 5.81.5
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(@types/better-sqlite3@7.6.13)(@types/pg@8.23.1)(@types/react@19.3.0)(better-sqlite3@11.10.0)(pg@8.23.0)(react@19.3.0)

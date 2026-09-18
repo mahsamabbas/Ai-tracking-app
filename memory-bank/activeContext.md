@@ -1,9 +1,18 @@
 # Active context
 
-**Phase:** MVP scaffold implemented in repo.
+**Date:** 2026-09-18
 
-**Primary provider:** Claude Code.
+**Phase:** Local MVP stack implemented; legal pilot and production hardening remain.
 
-**Open:** Legal sign-off on monitoring notice; Cursor Enterprise API confirmation.
+**Local run:**
 
-**Feature flags:** FR-024 LLM hourly narrative — off.
+```bash
+docker compose up -d postgres redis
+# existing DB: apply infra/sql/002_devices_projects_sessions.sql
+pnpm dev
+# optional: pnpm dev:worker
+```
+
+**New surfaces:** `docs/api.md`, web routes `/hourly/[id]`, `/my-activity`, SSE on overview.
+
+**Backlog:** [pending.md](pending.md) (updated after engineering pass).

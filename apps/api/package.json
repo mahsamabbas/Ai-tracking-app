@@ -14,9 +14,11 @@
     "@nestjs/core": "^10.4.15",
     "@nestjs/platform-fastify": "^10.4.15",
     "@noble/ed25519": "^2.2.3",
+    "@techlio/event-schema": "workspace:*",
     "@techlio/server-core": "workspace:*",
     "drizzle-orm": "^0.38.3",
     "fastify": "^4.28.1",
+    "bullmq": "^5.34.5",
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"

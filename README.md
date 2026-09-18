@@ -10,9 +10,13 @@ Monorepo for the AI Agent Activity Monitoring Dashboard (PRD v0.2).
 cd /Users/macbookpro/Documents/TechlioTrackingApp
 pnpm install
 docker compose up -d postgres redis
+# If Postgres already existed before 002 migration, run once:
+# docker exec -i $(docker compose ps -q postgres) psql -U techlio -d techlio_activity < infra/sql/002_devices_projects_sessions.sql
 pnpm build
 pnpm dev
 ```
+
+API reference: `docs/api.md`.
 
 That starts **API (3001), web (3000), and connector (9477)** in parallel. Optional hourly jobs: `pnpm dev:worker` in a second terminal (needs Redis).
 
