@@ -1,6 +1,7 @@
 "use client";
 
 import { providerLabel } from "@/lib/providers";
+import { useMounted } from "@/lib/use-mounted";
 
 export type DashboardFilters = {
   eventType: string;
@@ -22,14 +23,20 @@ export function FilterBar({
   onExportPdf: () => void;
   liveAt: string | null;
 }) {
+  const mounted = useMounted();
+  const liveLabel =
+    mounted && liveAt
+      ? `Live · ${new Date(liveAt).toLocaleTimeString()}`
+      : liveAt
+        ? "Live"
+        : null;
+
   return (
     <div className="mb-6 space-y-3 rounded-2xl border border-[#e6dfd2] bg-white p-4 shadow-[0_8px_30px_rgba(22,20,31,0.04)]">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-sm font-semibold text-slate-800">Filters</h3>
-        {liveAt ? (
-          <span className="text-xs text-emerald-700">
-            Live · {new Date(liveAt).toLocaleTimeString()}
-          </span>
+        {liveLabel ? (
+          <span className="text-xs text-emerald-700">{liveLabel}</span>
         ) : null}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

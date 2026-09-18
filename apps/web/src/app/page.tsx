@@ -16,6 +16,7 @@ import {
 import { EventsTable } from "@/components/EventsTable";
 import { ConnectorCards } from "@/components/ConnectorCards";
 import { CapabilityBanner } from "@/components/CapabilityBanner";
+import { AgentCollectionBanner } from "@/components/AgentCollectionBanner";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { TeamOverviewTable } from "@/components/TeamOverviewTable";
 import { FilterBar, type DashboardFilters } from "@/components/FilterBar";
@@ -160,6 +161,10 @@ export default function HomePage() {
   const agentVisible = mix
     .filter((m) => m.name !== "Connector")
     .reduce((s, m) => s + m.count, 0);
+  const heartbeatOnly =
+    events.length > 0 &&
+    agentVisible === 0 &&
+    events.every((e) => e.event_type === "heartbeat_sent");
 
   const title = isDeveloper
     ? `${user?.displayName?.split(" ")[0] ?? "Your"} overview`
@@ -171,6 +176,10 @@ export default function HomePage() {
   return (
     <AppShell title={title} subtitle={subtitle}>
       <CapabilityBanner provider={primaryProvider} />
+      <AgentCollectionBanner
+        provider={primaryProvider}
+        heartbeatOnly={heartbeatOnly}
+      />
 
       {canExport ? (
         <FilterBar
@@ -189,9 +198,7 @@ export default function HomePage() {
           }
         />
       ) : (
-        <p className="mb-4 text-xs text-slate-500">
-          {liveAt ? `Live · ${new Date(liveAt).toLocaleTimeString()}` : "Refreshing every 30s"}
-        </p>
+        <p className="mb-4 text-xs text-slate-500">Refreshing every 30s</p>
       )}
 
       {banner ? (

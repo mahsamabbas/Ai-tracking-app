@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useMounted } from "@/lib/use-mounted";
 import type { Role } from "@/lib/api";
 
 const ALL_NAV = [
@@ -20,9 +21,9 @@ function navActive(path: string, href: string) {
   return path === href || path.startsWith(`${href}/`);
 }
 
-function greeting(name?: string) {
-  const h = new Date().getHours();
-  const hello = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+function greetingForHour(h: number, name?: string) {
+  const hello =
+    h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   return name ? `${hello}, ${name}` : hello;
 }
 
@@ -44,7 +45,13 @@ export function AppShell({
 }) {
   const path = usePathname();
   const { user, logout, ready } = useAuth();
+  const mounted = useMounted();
   const [menuOpen, setMenuOpen] = useState(false);
+  const greetingLine = mounted
+    ? greetingForHour(new Date().getHours(), user?.displayName)
+    : user?.displayName
+      ? `Welcome, ${user.displayName}`
+      : "Welcome";
 
   const nav = useMemo(
     () => ALL_NAV.filter((item) => !user || item.roles.includes(user.role)),
@@ -214,7 +221,7 @@ export function AppShell({
             <span className="text-xs text-slate-500">{user.displayName}</span>
           </div>
           <p className="text-xs font-medium uppercase tracking-wide text-amber-800/80">
-            {greeting(user.displayName)}
+            {greetingLine}
           </p>
           <h2 className="font-serif text-2xl tracking-tight text-slate-900 sm:text-3xl">
             {title ?? "Overview"}
