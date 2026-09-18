@@ -18,7 +18,7 @@ It is **not** a timesheet, billing tool, or developer ranking system. It does **
 | **Evidence** | Every aggregate on the dashboard must be traceable to **normalized events** in Postgres |
 | **Coverage gaps** | Paused or offline connectors create explicit gaps—**never** “developer was inactive” |
 
-**Roles (target):** Administrator, Manager, Developer (self-view), Auditor. Local dev uses an `x-role` header stub until OIDC is wired.
+**Roles:** Administrator, Manager, Developer (self-view), Auditor. Local MVP uses JWT sign-in (`POST /v1/auth/login`) with role-scoped portals. OIDC/SSO is still pending for production.
 
 ---
 

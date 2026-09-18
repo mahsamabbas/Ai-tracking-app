@@ -5,21 +5,27 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
-import type { AuthUser, Role } from "./roles.js";
+import type { AuthUser, Role } from "@techlio/server-core";
+import { verifyUserToken } from "./jwt.js";
 import { DEV_DEVELOPER, DEV_ORG } from "../constants.js";
 
 export function userFromRequest(req: FastifyRequest): AuthUser {
-  const role = (req.headers["x-role"] as string | undefined) ?? "manager";
-  const org =
-    (req.headers["x-org-id"] as string | undefined) ?? DEV_ORG;
-  if (org !== DEV_ORG && role !== "administrator") {
-    throw new UnauthorizedException("organization_forbidden");
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) {
+    try {
+      return verifyUserToken(auth.slice(7));
+    } catch {
+      throw new UnauthorizedException("invalid_token");
+    }
   }
+  const role = (req.headers["x-role"] as string | undefined) ?? "manager";
   return {
     id: (req.headers["x-user-id"] as string) ?? "user-1",
-    organizationId: org,
+    organizationId: (req.headers["x-org-id"] as string) ?? DEV_ORG,
     role: role as Role,
     developerId: DEV_DEVELOPER,
+    displayName: "Dev user",
+    email: "dev@local",
   };
 }
 
@@ -27,10 +33,17 @@ export function userFromRequest(req: FastifyRequest): AuthUser {
 export class DashboardAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<FastifyRequest>();
-    const role = (req.headers["x-role"] as string | undefined) ?? "manager";
-    if (!role) throw new UnauthorizedException();
-    if (role === "developer" && !req.headers["x-developer-id"]) {
-      /* dev stub allows default developer id */
+    const auth = req.headers.authorization;
+    if (auth?.startsWith("Bearer ")) {
+      try {
+        verifyUserToken(auth.slice(7));
+        return true;
+      } catch {
+        throw new UnauthorizedException("invalid_token");
+      }
+    }
+    if (process.env.ALLOW_DEV_HEADER_AUTH === "0") {
+      throw new UnauthorizedException("token_required");
     }
     return true;
   }

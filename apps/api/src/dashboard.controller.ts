@@ -1,13 +1,12 @@
 import {
   Controller,
   Get,
-  Headers,
   Param,
   Query,
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
-import { canViewDeveloper, type AuthUser } from "./auth/roles.js";
+import { canViewDeveloper } from "./auth/roles.js";
 import {
   db,
   connectorHealth,
@@ -17,7 +16,10 @@ import {
 } from "@techlio/server-core";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { listRecentEvents } from "./services/ingest.js";
-import { DEV_DEVELOPER, DEV_ORG } from "./constants.js";
+import { DEV_DEVELOPER } from "./constants.js";
+import { DashboardAuthGuard, userFromRequest, requireRoles } from "./auth/guards.js";
+import type { FastifyRequest } from "fastify";
+import { Req } from "@nestjs/common";
 
 function currentHourStartUtc(now = new Date()): Date {
   return new Date(
@@ -28,19 +30,6 @@ function currentHourStartUtc(now = new Date()): Date {
       now.getUTCHours(),
     ),
   );
-}
-import { DashboardAuthGuard, userFromRequest, requireRoles } from "./auth/guards.js";
-import type { FastifyRequest } from "fastify";
-import { Req } from "@nestjs/common";
-
-function userFromHeader(roleHeader?: string): AuthUser {
-  const role = (roleHeader ?? "manager") as AuthUser["role"];
-  return {
-    id: "user-1",
-    organizationId: DEV_ORG,
-    role,
-    developerId: "550e8400-e29b-41d4-a716-446655440011",
-  };
 }
 
 @Controller("v1")
@@ -54,8 +43,15 @@ export class DashboardController {
     @Query("provider") provider?: string,
   ) {
     const user = userFromRequest(req);
+    const scopedDeveloperId =
+      user.role === "developer"
+        ? user.developerId ?? DEV_DEVELOPER
+        : developerId;
     if (user.role === "developer") {
       requireRoles(user, ["developer"]);
+    }
+    if (user.role === "auditor") {
+      requireRoles(user, ["auditor"]);
     }
     try {
       const health = await db
@@ -81,7 +77,7 @@ export class DashboardController {
 
       const pool = await listRecentEvents(user.organizationId, 200);
       const events = await listRecentEvents(user.organizationId, 50, {
-        developerId,
+        developerId: scopedDeveloperId,
         eventType,
         provider,
       });
@@ -89,7 +85,12 @@ export class DashboardController {
       const hourStart = currentHourStartUtc();
       const hourEnd = new Date(hourStart.getTime() + 3600_000);
 
-      const developers = health.map((h) => {
+      const healthRows =
+        user.role === "developer"
+          ? health.filter(() => true)
+          : health;
+
+      const developers = healthRows.map((h) => {
         const deviceEvents = pool.filter((e) => e.device_id === h.deviceId);
         const lastEvent = deviceEvents[0]?.occurred_at ?? null;
         const eventsThisHour = deviceEvents.filter((e) => {
@@ -180,10 +181,16 @@ export class DashboardController {
       }
 
       return {
-        connectors: health,
-        developers,
+        connectors: user.role === "developer" ? [] : health,
+        developers: user.role === "developer" ? [] : developers,
         alerts,
         recentEvents: events,
+        viewer: {
+          id: user.id,
+          displayName: user.displayName,
+          role: user.role,
+          email: user.email,
+        },
         dbAvailable: true,
       };
     } catch {
@@ -202,9 +209,9 @@ export class DashboardController {
   @UseGuards(DashboardAuthGuard)
   async timeline(
     @Param("id") developerId: string,
-    @Headers("x-role") roleHeader?: string,
+    @Req() req: FastifyRequest,
   ) {
-    const user = userFromHeader(roleHeader);
+    const user = userFromRequest(req);
     if (!canViewDeveloper(user, developerId)) {
       throw new UnauthorizedException();
     }

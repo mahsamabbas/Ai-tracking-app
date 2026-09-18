@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { EventsTable } from "@/components/EventsTable";
-import { fetchHourlySnapshot } from "@/lib/api";
+import { fetchHourlySnapshot } from "@/lib/client-api";
+import { useAuth } from "@/lib/auth-context";
 import type { ActivityEventRow } from "@/lib/types";
 import { formatDuration } from "@/lib/analytics";
 
@@ -33,6 +34,7 @@ function formatMetric(key: string, value: unknown): string {
 }
 
 export default function HourlyDetailPage() {
+  const { token } = useAuth();
   const params = useParams();
   const id = params.id as string;
   const [data, setData] = useState<{
@@ -48,8 +50,9 @@ export default function HourlyDetailPage() {
   } | null>(null);
 
   useEffect(() => {
-    void fetchHourlySnapshot(id).then(setData);
-  }, [id]);
+    if (!token) return;
+    void fetchHourlySnapshot(token, id).then(setData);
+  }, [id, token]);
 
   const metrics = data?.snapshot?.metrics ?? {};
   const versions = data?.versions ?? [];
@@ -69,7 +72,7 @@ export default function HourlyDetailPage() {
         <p className="text-sm text-slate-500">Loading or snapshot not found…</p>
       ) : (
         <>
-          <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+          <section className="card mb-6">
             <p className="text-sm text-slate-600">
               Hour:{" "}
               <span className="font-medium text-slate-900">
@@ -88,7 +91,7 @@ export default function HourlyDetailPage() {
             ) : null}
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {METRIC_ROWS.map(({ key, label }) => (
-                <div key={key} className="rounded-md bg-slate-50 px-3 py-2">
+                <div key={key} className="rounded-xl bg-[#f4f1ea] px-3 py-2">
                   <p className="text-xs text-slate-500">{label}</p>
                   <p className="text-sm font-semibold text-slate-900">
                     {formatMetric(key, metrics[key])}

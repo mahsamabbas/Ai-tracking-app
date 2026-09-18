@@ -1,14 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { AlertBanner } from "@/components/AlertBanner";
 import { StatCard } from "@/components/StatCard";
 import { API_BASE, DEV_ID } from "@/lib/api";
+import { fetchTimeline } from "@/lib/client-api";
 import type { HourlySnapshot } from "@/lib/types";
 import { CapabilityBanner } from "@/components/CapabilityBanner";
 import { formatDuration } from "@/lib/analytics";
+import { useAuth } from "@/lib/auth-context";
 import {
   Bar,
   BarChart,
@@ -20,20 +22,17 @@ import {
 } from "recharts";
 
 export default function DeveloperDayPage() {
+  const { token, user } = useAuth();
+  const developerId = user?.developerId ?? DEV_ID;
   const [cards, setCards] = useState<HourlySnapshot[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/v1/developers/${DEV_ID}/timeline`, {
-      headers: { "x-role": "manager" },
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error("API error");
-        const j = await r.json();
-        setCards(j.hourlyCards ?? []);
-      })
+    if (!token) return;
+    fetchTimeline(token, developerId)
+      .then((j) => setCards(j.hourlyCards ?? []))
       .catch(() => setError("Could not load timeline — check API and database."));
-  }, []);
+  }, [token, developerId]);
 
   const chartData = cards.map((c) => {
     const m = c.metrics ?? {};
@@ -46,16 +45,16 @@ export default function DeveloperDayPage() {
         : "—";
     return {
       hour,
-      active: Math.round((m.mergedActiveDurationMs ?? 0) / 1000),
       model: Math.round((m.modelDurationMs ?? 0) / 1000),
       tools: Math.round((m.toolDurationMs ?? 0) / 1000),
+      merged: Math.round((m.mergedActiveDurationMs ?? 0) / 1000),
     };
   });
 
   return (
     <AppShell
       title="Developer day"
-      subtitle="Hourly cards with separate duration metrics (PRD §11)"
+      subtitle="One card per clock hour — five durations stay separate (PRD §11)"
     >
       {error ? (
         <AlertBanner variant="warning" title={error} />
@@ -65,7 +64,7 @@ export default function DeveloperDayPage() {
           <AlertBanner
             variant="info"
             title="No hourly summaries yet"
-            detail="Cursor does not expose hourly agent sessions. The worker can still finalize an hour from companion file/task events, but model and tool duration stay 'not available from provider'."
+            detail="The worker finalizes each hour at :05 UTC. Cursor is Tier B — model/tool duration may stay 'not available from provider'."
           />
         </>
       ) : null}
@@ -77,7 +76,7 @@ export default function DeveloperDayPage() {
             <StatCard
               label="Latest version"
               value={cards[cards.length - 1]?.version ?? 1}
-              hint="Recalc creates new version"
+              hint="Late events create a new version"
             />
             <StatCard
               label="Completeness"
@@ -86,16 +85,20 @@ export default function DeveloperDayPage() {
             />
           </section>
 
-          <div className="card mb-8 h-[300px]">
-            <h3 className="text-sm font-semibold">Active time by hour (seconds)</h3>
-            <ResponsiveContainer width="100%" height="90%">
+          <div className="card mb-8 h-[280px] min-w-0">
+            <h3 className="text-sm font-semibold">Durations by hour (seconds)</h3>
+            <p className="text-xs text-slate-500">
+              Model, tool, and merged active — never shown as one metric
+            </p>
+            <ResponsiveContainer width="100%" height="85%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Bar dataKey="model" stackId="a" fill="#818cf8" name="Model" />
-                <Bar dataKey="tools" stackId="a" fill="#34d399" name="Tools" />
+                <Bar dataKey="model" fill="#818cf8" name="Model" />
+                <Bar dataKey="tools" fill="#34d399" name="Tools" />
+                <Bar dataKey="merged" fill="#fbbf24" name="Merged active" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -109,7 +112,7 @@ export default function DeveloperDayPage() {
           return (
             <article key={c.id ?? i} className="card">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold text-slate-900">
+                <h3 className="font-serif text-lg text-slate-900">
                   {hourLabel
                     ? new Date(hourLabel as string).toLocaleString()
                     : `Hour ${i + 1}`}
@@ -136,7 +139,7 @@ export default function DeveloperDayPage() {
                 ].map(([label, ms]) => (
                   <div
                     key={label as string}
-                    className="rounded-lg bg-slate-50 px-3 py-2"
+                    className="rounded-xl bg-[#f4f1ea] px-3 py-2"
                   >
                     <p className="text-xs text-slate-500">{label as string}</p>
                     <p className="font-mono text-sm font-medium">
@@ -149,6 +152,7 @@ export default function DeveloperDayPage() {
           );
         })}
       </div>
+      <p className="mt-4 hidden text-xs text-slate-400">{API_BASE}</p>
     </AppShell>
   );
 }

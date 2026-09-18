@@ -1,20 +1,21 @@
 import { AppShell } from "@/components/AppShell";
 
 const ROWS = [
+  { action: "auth.login", role: "all", note: "JWT portal sign-in" },
   { action: "events.batch_ingest", role: "connector", note: "Append-only ingest" },
   { action: "connector.pause", role: "developer", note: "Creates coverage gap" },
-  { action: "login", role: "all", note: "OIDC — pilot pending" },
+  { action: "activity.export", role: "manager / auditor", note: "CSV or PDF download" },
 ];
 
 export default function AuditPage() {
   return (
     <AppShell
       title="Audit history"
-      subtitle="Security and policy actions (read-only pilot view)"
+      subtitle="Security and policy actions for your organization"
     >
       <div className="card overflow-hidden p-0">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="bg-[#f4f1ea] text-xs uppercase text-slate-500">
             <tr>
               <th className="px-5 py-3">Action</th>
               <th className="px-5 py-3">Actor</th>
@@ -33,8 +34,7 @@ export default function AuditPage() {
         </table>
       </div>
       <p className="mt-4 text-xs text-slate-500">
-        Full audit stream from <code>audit_log</code> will appear after database
-        connectivity is enabled.
+        Login events are written to <code>audit_log</code> when Postgres is up.
       </p>
     </AppShell>
   );

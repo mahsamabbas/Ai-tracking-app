@@ -6,9 +6,11 @@ import {
 } from "@nestjs/platform-fastify";
 import { AppModule } from "./app.module.js";
 import { initRecalcQueue } from "./services/recalc-queue.js";
+import { seedPortalUsers } from "@techlio/server-core";
 
 async function bootstrap() {
   initRecalcQueue();
+  await seedPortalUsers();
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),

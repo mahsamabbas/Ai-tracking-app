@@ -44,3 +44,16 @@ That starts **API (3001), web (3000), and connector (9477)** in parallel. Option
 See `docs/policy/monitoring-notice-draft.md` before enabling monitoring on employee machines.
 
 The local connector labels the **host IDE** as the provider (Cursor when you run this repo in Cursor). Claude Code events are only tagged `claude_code` when Claude hooks actually fire. Cursor is Tier B: hourly model/tool metrics are not available from the provider.
+
+## Sign in (JWT portals)
+
+Open http://localhost:3000 — you will be redirected to `/login`.
+
+| Portal | Email | Password |
+|--------|-------|----------|
+| Manager | `manager@techlio.local` | `manager123` |
+| Developer | `developer@techlio.local` | `developer123` |
+| Admin | `admin@techlio.local` | `admin123` |
+| Auditor | `auditor@techlio.local` | `auditor123` |
+
+Each JWT encodes role, org, and (for developers) `developerId`. Navigation and APIs are scoped to that role.

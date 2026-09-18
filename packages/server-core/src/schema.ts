@@ -114,3 +114,13 @@ export const activityExports = pgTable("activity_exports", {
   content: text("content"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
+
+export const portalUsers = pgTable("portal_users", {
+  id: uuid("id").primaryKey(),
+  organizationId: uuid("organization_id").notNull(),
+  email: text("email").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  displayName: text("display_name").notNull(),
+  role: text("role").notNull(),
+  developerId: uuid("developer_id"),
+});

@@ -11,5 +11,16 @@ const pool = new pg.Pool({
 pool.query(`ALTER TABLE connector_health ADD COLUMN IF NOT EXISTS provider TEXT`).catch(() => {
   /* table may not exist yet on first boot */
 });
+pool.query(`
+  CREATE TABLE IF NOT EXISTS portal_users (
+    id UUID PRIMARY KEY,
+    organization_id UUID NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    developer_id UUID
+  )
+`).catch(() => {});
 
 export const db = drizzle(pool, { schema });

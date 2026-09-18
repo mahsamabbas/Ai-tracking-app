@@ -22,6 +22,7 @@ const config: Config = {
           "-apple-system",
           "sans-serif",
         ],
+        serif: ["Fraunces", "Georgia", "serif"],
       },
     },
   },

@@ -4,13 +4,15 @@ Base URL: `http://localhost:3001` (dev).
 
 ## Authentication
 
-- **Dashboard:** `x-role` header (`manager`, `developer`, `administrator`, `auditor`).
+- **Dashboard:** `Authorization: Bearer <jwt>` from `POST /v1/auth/login`. Token encodes role, org, and `developerId` for developer portals.
 - **Connector ingest:** `Authorization: Bearer <device-token>` and `X-Device-Id: <uuid>` (optional if device id is in first event).
 
 ## Endpoints
 
 | Method | Path | Notes |
 |--------|------|--------|
+| POST | `/v1/auth/login` | `{ email, password }` → JWT + user |
+| GET | `/v1/auth/me` | Bearer JWT → current user |
 | POST | `/v1/connectors/register` | Returns `{ deviceId, token }` |
 | POST | `/v1/connectors/:id/revoke` | Admin only |
 | POST | `/v1/connectors/:id/heartbeat` | Bearer token |

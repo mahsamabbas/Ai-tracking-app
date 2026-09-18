@@ -5,8 +5,11 @@ import {
   Headers,
   Param,
   Post,
+  Req,
   UnauthorizedException,
+  UseGuards,
 } from "@nestjs/common";
+import type { FastifyRequest } from "fastify";
 import {
   db,
   connectorHealth,
@@ -20,6 +23,7 @@ import { eq } from "drizzle-orm";
 import { DEV_DEVELOPER, DEV_ORG } from "./constants.js";
 import { EventTypes } from "@techlio/event-schema";
 import { randomUUID } from "node:crypto";
+import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 
 @Controller("v1/connectors")
 export class ConnectorsController {
@@ -39,9 +43,11 @@ export class ConnectorsController {
   }
 
   @Post(":id/revoke")
-  async revoke(@Param("id") id: string, @Headers("x-role") role?: string) {
-    if (role !== "administrator") throw new UnauthorizedException();
-    const ok = await revokeDevice(DEV_ORG, id);
+  @UseGuards(DashboardAuthGuard)
+  async revoke(@Param("id") id: string, @Req() req: FastifyRequest) {
+    const user = userFromRequest(req);
+    requireRoles(user, ["administrator"]);
+    const ok = await revokeDevice(user.organizationId, id);
     return { revoked: ok };
   }
 
@@ -89,7 +95,10 @@ export class ConnectorsController {
   }
 
   @Get(":id/health")
-  async health(@Param("id") id: string) {
+  @UseGuards(DashboardAuthGuard)
+  async health(@Param("id") id: string, @Req() req: FastifyRequest) {
+    const user = userFromRequest(req);
+    requireRoles(user, ["administrator", "manager", "auditor"]);
     const rows = await db
       .select()
       .from(connectorHealth)

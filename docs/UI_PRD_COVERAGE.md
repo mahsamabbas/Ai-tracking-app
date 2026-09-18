@@ -17,7 +17,7 @@ This tracks what the **web app** exposes today versus PRD v0.2. Backend gaps are
 | FR-026 | `FilterBar` — provider, event type, connector state, coverage-only |
 | FR-027 | `AlertsPanel` (stale, paused, unassigned, gap events) |
 | FR-028 | CSV + PDF export buttons on overview |
-| Roles (stub) | `RoleSwitcher` → `x-role` header |
+| Roles | JWT portals at `/login`; nav + APIs scoped by role |
 
 ## Responsive / mobile (NFR-007 partial)
 

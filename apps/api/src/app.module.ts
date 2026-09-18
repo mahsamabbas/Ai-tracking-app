@@ -6,9 +6,11 @@ import { ProjectsController } from "./projects.controller.js";
 import { SessionsController } from "./sessions.controller.js";
 import { ExportsController } from "./exports.controller.js";
 import { StreamController } from "./stream.controller.js";
+import { AuthController } from "./auth/auth.controller.js";
 
 @Module({
   controllers: [
+    AuthController,
     EventsController,
     DashboardController,
     ConnectorsController,

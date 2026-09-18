@@ -8,3 +8,5 @@ export * from "./sessionize.js";
 export * from "./exports.js";
 export * from "./snapshots.js";
 export * from "./retention.js";
+export * from "./users.js";
+export * from "./roles.js";

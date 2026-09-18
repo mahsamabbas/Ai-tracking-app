@@ -22,7 +22,7 @@ Last reviewed: 2026-09-18 (post engineering pass).
 
 | ID | Status |
 |----|--------|
-| FR-001 | **Pending** — OIDC/SSO (still `x-role` dev auth) |
+| FR-001 | **Partial** — JWT login + RBAC portals (SSO/OIDC still pending) |
 | FR-002 | **Partial** — guards on dashboard routes; not full Admin/Auditor UI |
 | FR-003 | **Partial** — org header stub; not full tenant isolation |
 | FR-006 | **Partial** — Claude hooks; Codex/Gemini OTLP adapters pending |

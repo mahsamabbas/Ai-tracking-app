@@ -23,7 +23,7 @@ export function FilterBar({
   liveAt: string | null;
 }) {
   return (
-    <div className="mb-6 space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="mb-6 space-y-3 rounded-2xl border border-[#e6dfd2] bg-white p-4 shadow-[0_8px_30px_rgba(22,20,31,0.04)]">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-sm font-semibold text-slate-800">Filters</h3>
         {liveAt ? (
@@ -96,7 +96,7 @@ export function FilterBar({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className="min-h-[40px] rounded-lg bg-slate-800 px-4 text-sm text-white hover:bg-slate-700"
+          className="min-h-[40px] rounded-xl bg-[#16141f] px-4 text-sm text-white hover:bg-slate-800"
           onClick={onExportCsv}
         >
           Export CSV

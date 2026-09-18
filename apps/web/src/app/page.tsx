@@ -5,8 +5,12 @@ import { AppShell } from "@/components/AppShell";
 import { AlertBanner } from "@/components/AlertBanner";
 import { StatCard } from "@/components/StatCard";
 import {
+  DonutChart,
+  EngineeringChecksChart,
   EventTypesChart,
   EventsTimelineChart,
+  HourlyInteractionChart,
+  InteractionMixChart,
   ProviderPieChart,
 } from "@/components/ActivityCharts";
 import { EventsTable } from "@/components/EventsTable";
@@ -15,17 +19,25 @@ import { CapabilityBanner } from "@/components/CapabilityBanner";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { TeamOverviewTable } from "@/components/TeamOverviewTable";
 import { FilterBar, type DashboardFilters } from "@/components/FilterBar";
-import { API_BASE, createExport, fetchTeamDashboard, streamUrl } from "@/lib/api";
+import { API_BASE, DEV_ID, streamUrl } from "@/lib/api";
+import { createExport, fetchTeamDashboard } from "@/lib/client-api";
 import type { TeamResponse, ActivityEventRow } from "@/lib/types";
 import {
+  assignedVsUnassigned,
+  coverageVsActivity,
+  engineeringOutcomes,
   eventsByHour,
   eventsByType,
+  hourlyInteractionSeries,
+  interactionBuckets,
+  outcomesSplit,
   providerSplit,
+  toolCategories,
 } from "@/lib/analytics";
-import { useRole } from "@/lib/role-context";
+import { useAuth } from "@/lib/auth-context";
 
 export default function HomePage() {
-  const { role } = useRole();
+  const { token, user } = useAuth();
   const [data, setData] = useState<TeamResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<DashboardFilters>({
@@ -41,13 +53,22 @@ export default function HomePage() {
     detail?: string;
   } | null>(null);
 
+  const isDeveloper = user?.role === "developer";
+  const canExport =
+    user?.role === "manager" ||
+    user?.role === "administrator" ||
+    user?.role === "auditor";
+
   useEffect(() => {
+    if (!token) return;
     const load = async () => {
       try {
-        const { ok, status, json } = await fetchTeamDashboard({
+        const { ok, status, json } = await fetchTeamDashboard(token, {
           eventType: filters.eventType || undefined,
           provider: filters.provider || undefined,
-          role,
+          developerId: isDeveloper
+            ? user?.developerId ?? DEV_ID
+            : undefined,
         });
         const team: TeamResponse = {
           connectors: Array.isArray(json.connectors) ? json.connectors : [],
@@ -64,7 +85,7 @@ export default function HomePage() {
         if (!ok) {
           setBanner({
             variant: "error",
-            title: status >= 500 ? "Backend unavailable" : "Request failed",
+            title: status === 401 ? "Session expired" : "Request failed",
             detail: json.message as string | undefined,
           });
         } else if (json.dbAvailable === false) {
@@ -82,7 +103,7 @@ export default function HomePage() {
         setBanner({
           variant: "error",
           title: "Cannot reach API",
-          detail: `Is the API running at ${API_BASE}? Run pnpm dev.`,
+          detail: `Is the API running at ${API_BASE}?`,
         });
         setData({
           connectors: [],
@@ -97,7 +118,7 @@ export default function HomePage() {
     load();
     const id = setInterval(load, 30_000);
     return () => clearInterval(id);
-  }, [filters.eventType, filters.provider, role]);
+  }, [filters.eventType, filters.provider, token, isDeveloper, user?.developerId]);
 
   useEffect(() => {
     const es = new EventSource(streamUrl());
@@ -135,32 +156,43 @@ export default function HomePage() {
     connectors.find((c) => c.provider)?.provider ??
     events.find((e) => e.provider)?.provider;
 
+  const mix = interactionBuckets(events);
+  const agentVisible = mix
+    .filter((m) => m.name !== "Connector")
+    .reduce((s, m) => s + m.count, 0);
+
+  const title = isDeveloper
+    ? `${user?.displayName?.split(" ")[0] ?? "Your"} overview`
+    : "Team overview";
+  const subtitle = isDeveloper
+    ? "What the agent performed in your connected tools — the same metadata managers see"
+    : `Near-live connector status and agent-visible activity for ${user?.displayName ?? "your org"}`;
+
   return (
-    <AppShell
-      title="Team overview"
-      subtitle="Near-live connector status and agent-visible activity"
-    >
+    <AppShell title={title} subtitle={subtitle}>
       <CapabilityBanner provider={primaryProvider} />
 
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        liveAt={liveAt}
-        onExportCsv={() =>
-          void createExport("csv").then((r) => {
-            if (r.downloadUrl) {
-              window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
-            }
-          })
-        }
-        onExportPdf={() =>
-          void createExport("pdf").then((r) => {
-            if (r.downloadUrl) {
-              window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
-            }
-          })
-        }
-      />
+      {canExport ? (
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          liveAt={liveAt}
+          onExportCsv={() =>
+            void createExport(token, "csv").then((r) => {
+              if (r.downloadUrl) window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
+            })
+          }
+          onExportPdf={() =>
+            void createExport(token, "pdf").then((r) => {
+              if (r.downloadUrl) window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
+            })
+          }
+        />
+      ) : (
+        <p className="mb-4 text-xs text-slate-500">
+          {liveAt ? `Live · ${new Date(liveAt).toLocaleTimeString()}` : "Refreshing every 30s"}
+        </p>
+      )}
 
       {banner ? (
         <AlertBanner
@@ -176,9 +208,9 @@ export default function HomePage() {
         <>
           <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              label="Recent events"
-              value={events.length}
-              hint="Filtered sample"
+              label="Agent-visible events"
+              value={agentVisible}
+              hint="Excludes connector heartbeats"
               accent="indigo"
             />
             <StatCard
@@ -188,41 +220,96 @@ export default function HomePage() {
               accent="emerald"
             />
             <StatCard
-              label="Alerts"
+              label="Coverage alerts"
               value={data?.alerts?.length ?? 0}
-              hint="Connector & coverage"
+              hint="Gaps, pause, stale — not inactivity"
               accent="amber"
             />
             <StatCard
-              label="Data store"
-              value={data?.dbAvailable === false ? "Offline" : "Ready"}
-              hint={data?.dbAvailable === false ? "Docker required" : "Postgres"}
-              accent={data?.dbAvailable === false ? "amber" : "emerald"}
+              label="Unassigned sessions"
+              value={
+                assignedVsUnassigned(events).find((d) => d.name === "Unassigned")
+                  ?.value ?? 0
+              }
+              hint="No project / work item"
             />
           </section>
 
-          <section className="mb-6 grid gap-4 lg:grid-cols-2">
-            <TeamOverviewTable rows={developers} />
-            <AlertsPanel alerts={data?.alerts ?? []} />
-          </section>
+          {!isDeveloper ? (
+            <section className="mb-6 grid gap-4 lg:grid-cols-2">
+              <TeamOverviewTable rows={developers} />
+              <AlertsPanel alerts={data?.alerts ?? []} />
+            </section>
+          ) : (
+            <section className="mb-6">
+              <AlertsPanel alerts={data?.alerts ?? []} />
+            </section>
+          )}
 
           <section className="mb-6 grid gap-4 lg:grid-cols-3">
             <div className="min-w-0 lg:col-span-2">
-              <EventsTimelineChart data={eventsByHour(events)} />
+              <HourlyInteractionChart data={hourlyInteractionSeries(events)} />
             </div>
             <div className="min-w-0">
-              <ProviderPieChart data={providerSplit(events)} />
+              <InteractionMixChart data={mix} />
             </div>
+          </section>
+
+          <section className="mb-6 grid gap-4 lg:grid-cols-3">
+            <EventsTimelineChart data={eventsByHour(events)} />
+            <DonutChart
+              title="Task context"
+              subtitle="Assigned vs unassigned (FR-011)"
+              data={assignedVsUnassigned(events)}
+            />
+            <DonutChart
+              title="Outcomes"
+              subtitle="Succeeded / started / failed"
+              data={outcomesSplit(events)}
+            />
           </section>
 
           <section className="mb-6 grid gap-4 lg:grid-cols-2">
             <EventTypesChart data={eventsByType(events)} />
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-slate-800">
-                Connectors
-              </h3>
-              <ConnectorCards connectors={connectors} />
-            </div>
+            <EngineeringChecksChart data={engineeringOutcomes(events)} />
+          </section>
+
+          <section className="mb-6 grid gap-4 lg:grid-cols-3">
+            <DonutChart
+              title="Tool categories"
+              subtitle="file_read, shell, test, build… when present"
+              data={toolCategories(events).map((d) => ({
+                name: d.name,
+                value: d.count,
+              }))}
+            />
+            <DonutChart
+              title="Coverage vs activity"
+              subtitle="Missing telemetry is not zero work"
+              data={coverageVsActivity(events)}
+            />
+            <ProviderPieChart data={providerSplit(events)} />
+          </section>
+
+          <section className="mb-6">
+            {!isDeveloper ? (
+              <div>
+                <h3 className="mb-3 font-serif text-lg text-slate-900">
+                  Connectors
+                </h3>
+                <ConnectorCards connectors={connectors} />
+              </div>
+            ) : (
+              <div className="card">
+                <h3 className="font-serif text-lg text-slate-900">
+                  Your collection
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Pause from the IDE companion. Pauses show as coverage gaps,
+                  never as proof you were inactive.
+                </p>
+              </div>
+            )}
           </section>
 
           <section>
