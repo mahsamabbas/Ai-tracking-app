@@ -1,5 +1,6 @@
 import type { ActivityEventRow } from "@/lib/types";
 import { formatTime } from "@/lib/analytics";
+import { formatEventContext, formatEventStatus } from "@/lib/event-display";
 import { providerLabel } from "@/lib/providers";
 
 export function EventsTable({ events }: { events: ActivityEventRow[] }) {
@@ -34,8 +35,10 @@ export function EventsTable({ events }: { events: ActivityEventRow[] }) {
               {formatTime(e.occurred_at)}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              {providerLabel(e.provider)} ·{" "}
-              {e.project_id ? "Assigned" : "Unassigned"}
+              {providerLabel(e.provider)} · {formatEventContext(e)}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Status: {formatEventStatus(e)}
             </p>
           </li>
         ))}
@@ -65,10 +68,10 @@ export function EventsTable({ events }: { events: ActivityEventRow[] }) {
                   {providerLabel(e.provider)}
                 </td>
                 <td className="px-4 py-3 text-slate-600">
-                  {e.project_id || e.work_item_id ? "Assigned" : "Unassigned"}
+                  {formatEventContext(e)}
                 </td>
                 <td className="px-4 py-3">
-                  <span className="badge-muted">{e.status ?? "—"}</span>
+                  <span className="badge-muted">{formatEventStatus(e)}</span>
                 </td>
               </tr>
             ))}

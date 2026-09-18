@@ -226,6 +226,16 @@ export async function listRecentEvents(
   if (filters?.provider) {
     events = events.filter((e) => e.provider === filters.provider);
   }
+
+  events.sort((a, b) => {
+    const aHb = a.event_type === "heartbeat_sent" ? 1 : 0;
+    const bHb = b.event_type === "heartbeat_sent" ? 1 : 0;
+    if (aHb !== bHb) return aHb - bHb;
+    return (
+      new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime()
+    );
+  });
+
   return events.slice(0, limit);
 }
 

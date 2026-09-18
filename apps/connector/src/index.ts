@@ -17,6 +17,20 @@ import { uploadBatch } from "./uploader.js";
 let paused = false;
 /** Actual host agent — declared by the IDE companion, not hardcoded as Claude. */
 let hostProvider = config.provider;
+let activeSessionId: string | undefined;
+let contextLabel: string | undefined;
+
+function defaultStatus(
+  eventType: ActivityEvent["event_type"],
+): ActivityEvent["status"] | undefined {
+  if (eventType === "heartbeat_sent") return "succeeded";
+  if (eventType.endsWith("_completed")) return "succeeded";
+  if (eventType.endsWith("_started")) return "started";
+  if (eventType === "connector_paused" || eventType === "session_paused") {
+    return "unknown";
+  }
+  return undefined;
+}
 const deviceToken = config.deviceToken;
 const signingKey = loadOrCreateSigningKey(config.signingKeyHex);
 mkdirSync(dirname(config.dbPath), { recursive: true });
@@ -37,6 +51,10 @@ function baseEvent(
   eventType: ActivityEvent["event_type"],
   extra?: Partial<ActivityEvent>,
 ): ActivityEvent {
+  const meta = { ...(extra?.metadata ?? {}) };
+  if (contextLabel && !meta.path_category) {
+    meta.path_category = contextLabel.slice(0, 64);
+  }
   return {
     event_id: crypto.randomUUID(),
     schema_version: "1.0.0",
@@ -48,7 +66,10 @@ function baseEvent(
     event_type: eventType,
     occurred_at: new Date().toISOString(),
     consent_version: config.consentVersion,
+    session_id: extra?.session_id ?? activeSessionId,
+    status: extra?.status ?? defaultStatus(eventType),
     ...extra,
+    metadata: Object.keys(meta).length ? meta : extra?.metadata,
   };
 }
 
@@ -201,9 +222,25 @@ app.post("/hooks/extension", async (req) => {
   if (!allowed.has(eventType)) {
     return { accepted: 0 };
   }
+
+  if (typeof body.session_id === "string") {
+    activeSessionId = body.session_id;
+  }
+  if (eventType === EventTypes.session_started && body.session_id) {
+    activeSessionId = String(body.session_id);
+  }
+  if (eventType === EventTypes.task_context_changed && typeof body.label === "string") {
+    contextLabel = body.label;
+  }
+
   const event = baseEvent(eventType as ActivityEvent["event_type"], {
     provider: hostProvider,
     session_id: typeof body.session_id === "string" ? body.session_id : undefined,
+    status:
+      eventType === EventTypes.task_context_changed ||
+      eventType === EventTypes.session_started
+        ? "succeeded"
+        : undefined,
     metadata:
       typeof body.file_path === "string"
         ? {
