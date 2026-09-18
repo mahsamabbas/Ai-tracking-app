@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { RoleProvider } from "@/lib/role-context";
 
 export const metadata: Metadata = {
   title: "Techlio AI Activity",
   description: "AI agent activity monitoring dashboard",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -25,7 +32,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <RoleProvider>{children}</RoleProvider>
+      </body>
     </html>
   );
 }

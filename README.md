@@ -16,7 +16,9 @@ pnpm build
 pnpm dev
 ```
 
-API reference: `docs/api.md`.
+- **Technical overview (architecture & data flow):** [docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md)
+- **UI vs PRD coverage:** [docs/UI_PRD_COVERAGE.md](docs/UI_PRD_COVERAGE.md)
+- **API reference:** [docs/api.md](docs/api.md)
 
 That starts **API (3001), web (3000), and connector (9477)** in parallel. Optional hourly jobs: `pnpm dev:worker` in a second terminal (needs Redis).
 

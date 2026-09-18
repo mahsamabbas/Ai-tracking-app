@@ -2,14 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { RoleSwitcher } from "./RoleSwitcher";
 
 const NAV = [
   { href: "/", label: "Overview", desc: "Team & live signals" },
   { href: "/developer-day", label: "Developer day", desc: "Hourly timeline" },
   { href: "/my-activity", label: "My activity", desc: "Developer self-view" },
   { href: "/connectors", label: "Connectors", desc: "Health & versions" },
+  { href: "/policy", label: "Policy", desc: "Collection notice" },
   { href: "/audit", label: "Audit", desc: "Access & policy" },
 ];
+
+function navActive(path: string, href: string) {
+  if (href === "/") return path === "/";
+  return path === href || path.startsWith(`${href}/`);
+}
 
 export function AppShell({
   children,
@@ -21,10 +29,28 @@ export function AppShell({
   subtitle?: string;
 }) {
   const path = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [path]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="hidden h-screen w-64 shrink-0 flex-col overflow-hidden border-r border-slate-800 bg-slate-900 text-slate-100 md:flex">
+    <div className="flex h-[100dvh] overflow-hidden">
+      {/* Desktop sidebar */}
+      <aside
+        className="hidden h-full w-64 shrink-0 flex-col border-r border-slate-800 bg-slate-900 text-slate-100 md:flex"
+        aria-label="Main navigation"
+      >
         <div className="shrink-0 border-b border-slate-700 px-5 py-6">
           <p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
             Techlio
@@ -38,10 +64,7 @@ export function AppShell({
         </div>
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {NAV.map((item) => {
-            const active =
-              item.href === "/"
-                ? path === "/"
-                : path === item.href || path.startsWith(`${item.href}/`);
+            const active = navActive(path, item.href);
             return (
               <Link
                 key={item.href}
@@ -62,38 +85,79 @@ export function AppShell({
             );
           })}
         </nav>
-        <div className="shrink-0 border-t border-slate-700 p-4 text-xs text-slate-500">
-          Live: SSE + 30s poll on overview
+        <div className="shrink-0 space-y-3 border-t border-slate-700 p-4">
+          <RoleSwitcher dark />
+          <p className="text-xs text-slate-500">SSE + 30s refresh on overview</p>
         </div>
       </aside>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-5 md:px-8">
-          <div className="md:hidden">
-            <nav className="mb-3 flex gap-2 overflow-x-auto text-sm">
+      {/* Mobile drawer */}
+      {menuOpen ? (
+        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal>
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-900/50"
+            aria-label="Close menu"
+            onClick={() => setMenuOpen(false)}
+          />
+          <aside
+            className="absolute left-0 top-0 flex h-full w-[min(100%,280px)] flex-col bg-slate-900 text-slate-100 shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-4">
+              <span className="font-semibold">Menu</span>
+              <button
+                type="button"
+                className="min-h-[44px] min-w-[44px] rounded-lg text-2xl leading-none text-slate-300"
+                onClick={() => setMenuOpen(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <nav className="flex-1 space-y-1 overflow-y-auto p-3">
               {NAV.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`shrink-0 rounded-full px-3 py-1 ${
-                    path === item.href
+                  className={`block rounded-lg px-3 py-3 text-sm font-medium ${
+                    navActive(path, item.href)
                       ? "bg-indigo-600 text-white"
-                      : "bg-slate-100 text-slate-700"
+                      : "text-slate-300"
                   }`}
                 >
                   {item.label}
                 </Link>
               ))}
             </nav>
+            <div className="border-t border-slate-700 p-4">
+              <RoleSwitcher dark />
+            </div>
+          </aside>
+        </div>
+      ) : null}
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 safe-top sm:px-6 md:px-8">
+          <div className="mb-3 flex items-center justify-between gap-3 md:hidden">
+            <button
+              type="button"
+              className="min-h-[44px] rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-800"
+              onClick={() => setMenuOpen(true)}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-nav"
+            >
+              Menu
+            </button>
+            <RoleSwitcher />
           </div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
             {title ?? "Overview"}
           </h2>
           {subtitle ? (
             <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
           ) : null}
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-6 py-6 md:px-8">
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 safe-bottom sm:px-6 sm:py-6 md:px-8">
           {children}
         </main>
       </div>

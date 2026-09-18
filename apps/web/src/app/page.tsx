@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { AlertBanner } from "@/components/AlertBanner";
 import { StatCard } from "@/components/StatCard";
@@ -12,6 +12,9 @@ import {
 import { EventsTable } from "@/components/EventsTable";
 import { ConnectorCards } from "@/components/ConnectorCards";
 import { CapabilityBanner } from "@/components/CapabilityBanner";
+import { AlertsPanel } from "@/components/AlertsPanel";
+import { TeamOverviewTable } from "@/components/TeamOverviewTable";
+import { FilterBar, type DashboardFilters } from "@/components/FilterBar";
 import { API_BASE, createExport, fetchTeamDashboard, streamUrl } from "@/lib/api";
 import type { TeamResponse, ActivityEventRow } from "@/lib/types";
 import {
@@ -19,14 +22,17 @@ import {
   eventsByType,
   providerSplit,
 } from "@/lib/analytics";
-import { providerLabel } from "@/lib/providers";
+import { useRole } from "@/lib/role-context";
 
 export default function HomePage() {
+  const { role } = useRole();
   const [data, setData] = useState<TeamResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<DashboardFilters>({
     eventType: "",
     provider: "",
+    coverageOnly: false,
+    connectorState: "",
   });
   const [liveAt, setLiveAt] = useState<string | null>(null);
   const [banner, setBanner] = useState<{
@@ -41,9 +47,12 @@ export default function HomePage() {
         const { ok, status, json } = await fetchTeamDashboard({
           eventType: filters.eventType || undefined,
           provider: filters.provider || undefined,
+          role,
         });
         const team: TeamResponse = {
           connectors: Array.isArray(json.connectors) ? json.connectors : [],
+          developers: Array.isArray(json.developers) ? json.developers : [],
+          alerts: Array.isArray(json.alerts) ? json.alerts : [],
           recentEvents: Array.isArray(json.recentEvents)
             ? json.recentEvents
             : [],
@@ -75,7 +84,12 @@ export default function HomePage() {
           title: "Cannot reach API",
           detail: `Is the API running at ${API_BASE}? Run pnpm dev.`,
         });
-        setData({ connectors: [], recentEvents: [] });
+        setData({
+          connectors: [],
+          developers: [],
+          alerts: [],
+          recentEvents: [],
+        });
       } finally {
         setLoading(false);
       }
@@ -83,14 +97,14 @@ export default function HomePage() {
     load();
     const id = setInterval(load, 30_000);
     return () => clearInterval(id);
-  }, [filters.eventType, filters.provider]);
+  }, [filters.eventType, filters.provider, role]);
 
   useEffect(() => {
     const es = new EventSource(streamUrl());
     es.onmessage = (ev) => {
       try {
-        const data = JSON.parse(ev.data) as { at?: string };
-        if (data.at) setLiveAt(data.at);
+        const parsed = JSON.parse(ev.data) as { at?: string };
+        if (parsed.at) setLiveAt(parsed.at);
       } catch {
         /* ignore */
       }
@@ -100,11 +114,23 @@ export default function HomePage() {
 
   const events = (data?.recentEvents ?? []) as ActivityEventRow[];
   const connectors = data?.connectors ?? [];
+  const developers = useMemo(() => {
+    let rows = data?.developers ?? [];
+    if (filters.coverageOnly) {
+      rows = rows.filter((d) => d.coverageWarning);
+    }
+    if (filters.connectorState) {
+      rows = rows.filter((d) => d.connectorState === filters.connectorState);
+    }
+    return rows;
+  }, [data?.developers, filters.coverageOnly, filters.connectorState]);
+
   const onlineCount = connectors.filter((c) => {
     const last = c.lastHeartbeat ?? c.last_heartbeat;
     if (!last) return false;
     return Date.now() - new Date(last).getTime() < 5 * 60 * 1000;
   }).length;
+
   const primaryProvider =
     connectors.find((c) => c.provider)?.provider ??
     events.find((e) => e.provider)?.provider;
@@ -116,56 +142,25 @@ export default function HomePage() {
     >
       <CapabilityBanner provider={primaryProvider} />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="text-sm text-slate-600">
-          Event type
-          <input
-            className="ml-2 rounded border border-slate-300 px-2 py-1 text-sm"
-            value={filters.eventType}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, eventType: e.target.value }))
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        liveAt={liveAt}
+        onExportCsv={() =>
+          void createExport("csv").then((r) => {
+            if (r.downloadUrl) {
+              window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
             }
-            placeholder="All types"
-          />
-        </label>
-        <label className="text-sm text-slate-600">
-          Provider
-          <select
-            className="ml-2 rounded border border-slate-300 px-2 py-1 text-sm"
-            value={filters.provider}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, provider: e.target.value }))
+          })
+        }
+        onExportPdf={() =>
+          void createExport("pdf").then((r) => {
+            if (r.downloadUrl) {
+              window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
             }
-          >
-            <option value="">All providers</option>
-            {["cursor", "claude_code", "codex", "gemini", "github_copilot"].map(
-              (id) => (
-                <option key={id} value={id}>
-                  {providerLabel(id)}
-                </option>
-              ),
-            )}
-          </select>
-        </label>
-        <button
-          type="button"
-          className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700"
-          onClick={() =>
-            void createExport("csv").then((r) => {
-              if (r.downloadUrl) {
-                window.open(`${API_BASE}${r.downloadUrl}`, "_blank");
-              }
-            })
-          }
-        >
-          Export CSV
-        </button>
-        {liveAt ? (
-          <span className="text-xs text-emerald-700">
-            SSE live · {new Date(liveAt).toLocaleTimeString()}
-          </span>
-        ) : null}
-      </div>
+          })
+        }
+      />
 
       {banner ? (
         <AlertBanner
@@ -179,11 +174,11 @@ export default function HomePage() {
         <p className="text-sm text-slate-500">Loading dashboard…</p>
       ) : (
         <>
-          <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label="Recent events"
               value={events.length}
-              hint="Last ingested batch window"
+              hint="Filtered sample"
               accent="indigo"
             />
             <StatCard
@@ -193,10 +188,10 @@ export default function HomePage() {
               accent="emerald"
             />
             <StatCard
-              label="Event types"
-              value={eventsByType(events).length}
-              hint="Distinct in sample"
-              accent="slate"
+              label="Alerts"
+              value={data?.alerts?.length ?? 0}
+              hint="Connector & coverage"
+              accent="amber"
             />
             <StatCard
               label="Data store"
@@ -206,14 +201,21 @@ export default function HomePage() {
             />
           </section>
 
-          <section className="mb-8 grid gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <EventsTimelineChart data={eventsByHour(events)} />
-            </div>
-            <ProviderPieChart data={providerSplit(events)} />
+          <section className="mb-6 grid gap-4 lg:grid-cols-2">
+            <TeamOverviewTable rows={developers} />
+            <AlertsPanel alerts={data?.alerts ?? []} />
           </section>
 
-          <section className="mb-8 grid gap-4 lg:grid-cols-2">
+          <section className="mb-6 grid gap-4 lg:grid-cols-3">
+            <div className="min-w-0 lg:col-span-2">
+              <EventsTimelineChart data={eventsByHour(events)} />
+            </div>
+            <div className="min-w-0">
+              <ProviderPieChart data={providerSplit(events)} />
+            </div>
+          </section>
+
+          <section className="mb-6 grid gap-4 lg:grid-cols-2">
             <EventTypesChart data={eventsByType(events)} />
             <div>
               <h3 className="mb-3 text-sm font-semibold text-slate-800">

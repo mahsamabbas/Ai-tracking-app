@@ -25,7 +25,7 @@ export function EventsTimelineChart({
 }) {
   const hasData = data.some((d) => d.events > 0);
   return (
-    <div className="card h-[280px]">
+    <div className="card h-[240px] min-w-0 sm:h-[280px]">
       <h3 className="text-sm font-semibold text-slate-800">Events by hour</h3>
       <p className="text-xs text-slate-500">Current day (local hours)</p>
       {!hasData ? (
@@ -61,7 +61,7 @@ export function EventTypesChart({
 }) {
   const hasData = data.length > 0;
   return (
-    <div className="card h-[280px]">
+    <div className="card h-[240px] min-w-0 sm:h-[280px]">
       <h3 className="text-sm font-semibold text-slate-800">Event types</h3>
       <p className="text-xs text-slate-500">Top categories in recent window</p>
       {!hasData ? (
@@ -93,14 +93,14 @@ export function ProviderPieChart({
 }) {
   if (data.length === 0) {
     return (
-      <div className="card h-[280px]">
+      <div className="card h-[240px] min-w-0 sm:h-[280px]">
         <h3 className="text-sm font-semibold text-slate-800">By provider</h3>
         <p className="mt-12 text-center text-sm text-slate-400">No provider data</p>
       </div>
     );
   }
   return (
-    <div className="card h-[280px]">
+    <div className="card h-[240px] min-w-0 sm:h-[280px]">
       <h3 className="text-sm font-semibold text-slate-800">By provider</h3>
       <ResponsiveContainer width="100%" height="90%">
         <PieChart>
