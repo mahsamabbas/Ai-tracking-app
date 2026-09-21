@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { providerLabel, type ActivityEvent } from "@techlio/event-schema";
 import { db } from "./db.js";
 import { computeSessionMetrics } from "./sessions.js";
-import { DEMO_USERS, DEV_ORG } from "./users.js";
+import { DEMO_USERS, DEV_DEVICE_ALEX, DEV_ORG } from "./users.js";
 import { finalizeHourForDeveloper } from "./hourly.js";
 
 /**
@@ -240,13 +240,21 @@ export async function seedDemoOrganization(options?: {
     `);
 
     const devices: { id: string; provider: string }[] = [];
+    const isLiveEmployee = p.email === "developer@techlio.local";
     for (const prov of p.providers) {
-      const deviceId = uuidFrom("device", `${p.email}:${prov.provider}`);
+      const deviceId =
+        isLiveEmployee && prov.provider === "cursor"
+          ? DEV_DEVICE_ALEX
+          : uuidFrom("device", `${p.email}:${prov.provider}`);
       devices.push({ id: deviceId, provider: prov.provider });
+      const tokenHash =
+        deviceId === DEV_DEVICE_ALEX
+          ? createHash("sha256").update("dev-device-token").digest("hex")
+          : createHash("sha256").update(`seed-token:${deviceId}`).digest("hex");
       await db.execute(sql`
         INSERT INTO devices (id, organization_id, developer_id, token_hash, provider, label, created_at)
         VALUES (${deviceId}, ${orgId}, ${id},
-                ${createHash("sha256").update(`seed-token:${deviceId}`).digest("hex")},
+                ${tokenHash},
                 ${prov.provider}, ${`${p.name.split(" ")[0]}'s ${providerLabel(prov.provider)}`},
                 ${new Date(todayStart.getTime() - 60 * DAY)})
       `);
@@ -259,7 +267,17 @@ export async function seedDemoOrganization(options?: {
         if (p.connector === "offline") lastHeartbeat = null;
         if (p.connector === "paused") paused = 1;
       }
-      const demoState = isPrimary ? p.connector : "online";
+      // Alex's extra seeded tools (Claude Code, …) must not look like a live
+      // process. The local connector is Cursor-only unless another host reports in.
+      let demoState: string | null = isPrimary ? p.connector : "online";
+      if (isLiveEmployee && !isPrimary) {
+        demoState = "offline";
+        lastHeartbeat = null;
+      }
+      if (isLiveEmployee && isPrimary) {
+        demoState = null;
+        lastHeartbeat = null;
+      }
       await db.execute(sql`
         INSERT INTO connector_health (device_id, organization_id, last_heartbeat, version, queue_depth, paused, provider, demo_state)
         VALUES (${deviceId}, ${orgId}, ${lastHeartbeat}, '0.4.2',

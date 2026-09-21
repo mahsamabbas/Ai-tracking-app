@@ -1,6 +1,10 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { PRODUCTIVE_CLASSIFICATIONS } from "./activity.js";
+import {
+  connectorStateOf,
+  rollupConnectorState,
+} from "./connector-state.js";
 
 export interface DateRange {
   from: Date;
@@ -61,36 +65,6 @@ export interface EmployeeDirectoryFilters {
   sort?: "name" | "activity" | "sessions" | "recent";
 }
 
-const STALE_MS = 5 * 60 * 1000;
-
-export type ConnectorState = "online" | "stale" | "paused" | "offline";
-
-function connectorStateOf(
-  paused: number | null,
-  lastHeartbeat: Date | null,
-): ConnectorState {
-  if (paused === 1) return "paused";
-  if (!lastHeartbeat) return "offline";
-  return Date.now() - new Date(lastHeartbeat).getTime() > STALE_MS
-    ? "stale"
-    : "online";
-}
-
-/** Worst of several connector states — what the employee row should report. */
-function worstConnectorState(input: {
-  paused: number | null;
-  lastHeartbeat: Date | null;
-  anyOffline: boolean | null;
-  anyStale: boolean | null;
-  hasDevices: boolean;
-}): ConnectorState {
-  if (!input.hasDevices) return "offline";
-  if (input.anyOffline) return "offline";
-  if (input.paused === 1) return "paused";
-  if (input.anyStale) return "stale";
-  return connectorStateOf(input.paused, input.lastHeartbeat);
-}
-
 export async function listEmployeeDirectory(
   f: EmployeeDirectoryFilters,
 ): Promise<EmployeeDirectoryRow[]> {
@@ -107,6 +81,7 @@ export async function listEmployeeDirectory(
     last_heartbeat: Date | null;
     any_offline: boolean | null;
     any_stale: boolean | null;
+    any_online: boolean | null;
     active_ms: string | null;
     productive_ms: string | null;
     idle_ms: string | null;
@@ -133,20 +108,33 @@ export async function listEmployeeDirectory(
       GROUP BY s.developer_id
     ),
     health AS (
-      -- Worst state across the employee's connectors, so a healthy second
-      -- device never hides a stale or offline one (FR-019).
+      -- Person-level badge follows the live collector. Frozen demo devices
+      -- (demo_state = 'offline') are ignored so a seeded Claude row cannot
+      -- mark someone disconnected while Cursor is actually heartbeating.
       SELECT d.developer_id,
              MAX(ch.paused)                                         AS paused,
              MAX(ch.last_heartbeat)                                 AS last_heartbeat,
-             bool_or(ch.last_heartbeat IS NULL)                     AS any_offline,
-             bool_or(ch.last_heartbeat < NOW() - INTERVAL '5 minutes') AS any_stale
+             bool_or(
+               ch.demo_state IS DISTINCT FROM 'offline'
+               AND ch.last_heartbeat IS NULL
+             )                                                      AS any_offline,
+             bool_or(
+               ch.demo_state IS DISTINCT FROM 'offline'
+               AND ch.last_heartbeat < NOW() - INTERVAL '5 minutes'
+             )                                                      AS any_stale,
+             bool_or(
+               ch.demo_state IS DISTINCT FROM 'offline'
+               AND ch.paused IS DISTINCT FROM 1
+               AND ch.last_heartbeat IS NOT NULL
+               AND ch.last_heartbeat >= NOW() - INTERVAL '5 minutes'
+             )                                                      AS any_online
       FROM devices d
       LEFT JOIN connector_health ch ON ch.device_id = d.id
       WHERE d.organization_id = ${f.organizationId} AND d.revoked_at IS NULL
       GROUP BY d.developer_id
     )
     SELECT e.id, e.display_name, e.email, e.team, e.title, e.status,
-           h.paused, h.last_heartbeat, h.any_offline, h.any_stale,
+           h.paused, h.last_heartbeat, h.any_offline, h.any_stale, h.any_online,
            a.active_ms, a.productive_ms, a.idle_ms, a.elapsed_ms,
            a.sessions, a.model_requests, a.file_changes, a.last_active_at
     FROM employees e
@@ -205,11 +193,12 @@ export async function listEmployeeDirectory(
   let rows: EmployeeDirectoryRow[] = base.rows.map((r) => {
     const sessions = r.sessions ?? 0;
     const activeMs = Number(r.active_ms ?? 0);
-    const connectorState = worstConnectorState({
+    const connectorState = rollupConnectorState({
       paused: r.paused,
       lastHeartbeat: r.last_heartbeat,
       anyOffline: r.any_offline,
       anyStale: r.any_stale,
+      anyOnline: r.any_online,
       hasDevices: r.any_offline !== null,
     });
     return {
@@ -232,7 +221,11 @@ export async function listEmployeeDirectory(
       avgSessionMs: sessions > 0 ? Math.round(activeMs / sessions) : 0,
       tools: toolsBy.get(r.id) ?? [],
       trend: trendBy.get(r.id) ?? [],
-      coverageWarning: connectorState !== "online",
+      coverageWarning:
+        connectorState !== "online" ||
+        Boolean(r.any_offline) ||
+        Boolean(r.any_stale) ||
+        r.paused === 1,
     };
   });
 
@@ -387,6 +380,14 @@ interface ScopeFilters {
   provider?: string;
   team?: string;
   projectId?: string;
+}
+
+function developerIdIn(column: string, developerIds?: string[]) {
+  if (!developerIds?.length) return sql``;
+  return sql`AND ${sql.raw(column)} IN (${sql.join(
+    developerIds.map((id) => sql`${id}`),
+    sql`, `,
+  )})`;
 }
 
 function scopeWhere(f: ScopeFilters, range: DateRange) {
@@ -685,6 +686,7 @@ export async function coverageSummary(
       WHERE organization_id = ${organizationId}
         AND occurred_at >= ${range.from} AND occurred_at < ${range.to}
         AND event_type IN ('telemetry_gap_started','connector_paused','upload_failed','provider_capability_missing')
+        ${developerIdIn("activity_events.developer_id", developerIds)}
     `),
     db.execute<{ partial: number; unassigned: number }>(sql`
       SELECT COUNT(*) FILTER (WHERE s.coverage_state <> 'complete')::int AS partial,
@@ -693,20 +695,40 @@ export async function coverageSummary(
     `),
     db.execute<{ paused: number; stale: number; offline: number }>(sql`
       WITH h AS (
-        SELECT d.developer_id, MAX(ch.paused) AS paused, MAX(ch.last_heartbeat) AS last_heartbeat
+        SELECT d.developer_id,
+               bool_or(
+                 ch.demo_state IS DISTINCT FROM 'offline'
+                 AND ch.paused = 1
+               ) AS paused,
+               bool_or(
+                 ch.demo_state IS DISTINCT FROM 'offline'
+                 AND ch.paused IS DISTINCT FROM 1
+                 AND ch.last_heartbeat IS NOT NULL
+                 AND ch.last_heartbeat >= NOW() - INTERVAL '5 minutes'
+               ) AS online,
+               bool_or(
+                 ch.demo_state IS DISTINCT FROM 'offline'
+                 AND ch.last_heartbeat IS NOT NULL
+                 AND ch.last_heartbeat < NOW() - INTERVAL '5 minutes'
+               ) AS stale,
+               bool_or(
+                 ch.demo_state IS DISTINCT FROM 'offline'
+                 AND ch.last_heartbeat IS NULL
+               ) AS offline
         FROM devices d LEFT JOIN connector_health ch ON ch.device_id = d.id
         WHERE d.organization_id = ${organizationId} AND d.revoked_at IS NULL
+          ${developerIdIn("d.developer_id", developerIds)}
         GROUP BY d.developer_id
       )
-      SELECT COUNT(*) FILTER (WHERE paused = 1)::int AS paused,
-             COUNT(*) FILTER (WHERE paused IS DISTINCT FROM 1 AND last_heartbeat IS NOT NULL
-                              AND last_heartbeat < NOW() - INTERVAL '5 minutes')::int AS stale,
-             COUNT(*) FILTER (WHERE last_heartbeat IS NULL)::int AS offline
+      SELECT COUNT(*) FILTER (WHERE paused AND NOT online)::int AS paused,
+             COUNT(*) FILTER (WHERE stale AND NOT online AND NOT paused)::int AS stale,
+             COUNT(*) FILTER (WHERE offline AND NOT online AND NOT paused AND NOT stale)::int AS offline
       FROM h
     `),
     db.execute<{ count: number }>(sql`
       SELECT COUNT(*)::int AS count FROM employees e
       WHERE e.organization_id = ${organizationId} AND e.status = 'active'
+        ${developerIdIn("e.id", developerIds)}
         AND NOT EXISTS (
           SELECT 1 FROM agent_sessions s
           WHERE s.developer_id = e.id
@@ -877,6 +899,7 @@ export interface EmployeeDevice {
   queueDepth: number | null;
   paused: boolean;
   state: "online" | "stale" | "paused" | "offline";
+  isDemo: boolean;
 }
 
 export async function employeeDevices(
@@ -892,15 +915,17 @@ export async function employeeDevices(
     queue_depth: number | null;
     paused: number | null;
     health_provider: string | null;
+    demo_state: string | null;
   }>(sql`
     SELECT d.id, d.provider, d.label,
            ch.version, ch.last_heartbeat, ch.queue_depth, ch.paused,
-           ch.provider AS health_provider
+           ch.provider AS health_provider, ch.demo_state
     FROM devices d
     LEFT JOIN connector_health ch ON ch.device_id = d.id
     WHERE d.organization_id = ${organizationId}
       AND d.developer_id = ${developerId}
       AND d.revoked_at IS NULL
+      AND ch.demo_state IS DISTINCT FROM 'offline'
     ORDER BY d.created_at ASC
   `);
   return res.rows.map((r) => ({
@@ -912,6 +937,7 @@ export async function employeeDevices(
     queueDepth: r.queue_depth,
     paused: r.paused === 1,
     state: connectorStateOf(r.paused, r.last_heartbeat),
+    isDemo: r.demo_state != null,
   }));
 }
 

@@ -56,10 +56,22 @@ export type EmptyVariant =
   | "delayed"
   | "unassigned";
 
+export function emptyActivityVariant(
+  connectors: { state?: string; isDemo?: boolean }[],
+): "no-activity" | "paused" | "connector-offline" {
+  const live = connectors.filter((c) => !c.isDemo);
+  const pool = live.length > 0 ? live : connectors;
+  if (pool.some((c) => c.state === "online" || c.state === "stale")) {
+    return "no-activity";
+  }
+  if (pool.some((c) => c.state === "paused")) return "paused";
+  return "connector-offline";
+}
+
 const EMPTY_COPY: Record<EmptyVariant, { title: string; body: string }> = {
   "no-activity": {
     title: "No activity observed",
-    body: "The connector reported in, but no agent sessions occurred in this period.",
+    body: "The connector reported in, but no agent sessions occurred in this period. Cursor chat and completions are not sent here unless the Techlio companion records a save or task.",
   },
   "no-results": {
     title: "No matches",

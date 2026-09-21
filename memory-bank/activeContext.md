@@ -61,6 +61,10 @@ Seeded heartbeats are static, so the API re-anchors **only seeded** connector
 heartbeats once a minute (`demo-keepalive.ts`, `connector_health.demo_state`).
 Disabled with `DEMO_CONNECTOR_KEEPALIVE=0` or in production.
 
+Alex (the local `pnpm dev` connector identity) is excluded: demo Claude/Cursor
+rows are frozen unless a real heartbeat arrives. "Online" on Alex means the
+local connector actually reported in — it is not a process-less sample flag.
+
 ## Local run
 
 ```bash

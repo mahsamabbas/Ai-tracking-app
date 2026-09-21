@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import { EventBatchSchema, type ActivityEvent } from "@techlio/event-schema";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "./db.js";
-import { activityEvents, auditLog, connectorHealth, hourlySnapshots } from "./schema.js";
+import { activityEvents, auditLog, hourlySnapshots } from "./schema.js";
 import { scanEventForSecrets } from "./security.js";
 import { applySessionization } from "./sessionize.js";
+import { recordLiveHeartbeat } from "./devices.js";
 
 const seenEvents = new Set<string>();
 
@@ -141,31 +142,19 @@ export async function ingestBatch(
         const paused =
           event.event_type === "connector_paused" ||
           event.metadata?.connector_paused === true
-            ? 1
+            ? true
             : event.event_type === "connector_resumed"
-              ? 0
+              ? false
               : undefined;
-        await db
-          .insert(connectorHealth)
-          .values({
-            deviceId: event.device_id,
-            organizationId: event.organization_id,
-            lastHeartbeat: new Date(),
-            version: event.connector_version,
-            queueDepth: event.metadata?.queue_depth ?? 0,
-            paused: paused ?? 0,
-            provider: event.provider,
-          })
-          .onConflictDoUpdate({
-            target: connectorHealth.deviceId,
-            set: {
-              lastHeartbeat: new Date(),
-              version: event.connector_version,
-              queueDepth: event.metadata?.queue_depth ?? 0,
-              provider: event.provider,
-              ...(paused !== undefined ? { paused } : {}),
-            },
-          });
+        await recordLiveHeartbeat({
+          deviceId: event.device_id,
+          organizationId: event.organization_id,
+          developerId: event.developer_id,
+          version: event.connector_version,
+          queueDepth: event.metadata?.queue_depth ?? 0,
+          paused,
+          provider: event.provider,
+        });
       }
 
       if (

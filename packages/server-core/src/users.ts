@@ -7,6 +7,8 @@ import type { Role } from "./roles.js";
 export const DEV_ORG = "550e8400-e29b-41d4-a716-446655440010";
 export const DEV_DEVELOPER_ALEX = "550e8400-e29b-41d4-a716-446655440011";
 export const DEV_DEVELOPER_SAM = "550e8400-e29b-41d4-a716-446655440021";
+/** Local `pnpm dev` connector identity — must match apps/connector config. */
+export const DEV_DEVICE_ALEX = "550e8400-e29b-41d4-a716-446655440012";
 
 export const DEMO_USERS: {
   email: string;

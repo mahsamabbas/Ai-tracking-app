@@ -77,13 +77,17 @@ async function flushQueue(): Promise<void> {
   if (paused) return;
   const batch = queue.dequeueBatch();
   if (batch.length === 0) return;
-  const ok = await uploadBatch(
-    config.apiBaseUrl,
-    deviceToken,
-    signingKey,
-    batch,
-  );
-  if (!ok) queue.enqueue(batch);
+  try {
+    const ok = await uploadBatch(
+      config.apiBaseUrl,
+      deviceToken,
+      signingKey,
+      batch,
+    );
+    if (!ok) queue.enqueue(batch);
+  } catch {
+    queue.enqueue(batch);
+  }
 }
 
 async function postApiHeartbeat(): Promise<void> {
@@ -214,11 +218,13 @@ app.post("/hooks/extension", async (req) => {
   const allowed = new Set<string>([
     EventTypes.file_modified,
     EventTypes.file_created,
+    EventTypes.file_deleted,
     EventTypes.test_completed,
     EventTypes.build_completed,
     EventTypes.lint_completed,
     EventTypes.task_context_changed,
     EventTypes.session_started,
+    EventTypes.session_heartbeat,
     EventTypes.session_ended,
   ]);
   if (!allowed.has(eventType)) {
@@ -231,35 +237,37 @@ app.post("/hooks/extension", async (req) => {
   if (eventType === EventTypes.session_started && body.session_id) {
     activeSessionId = String(body.session_id);
   }
-  if (eventType === EventTypes.task_context_changed && typeof body.label === "string") {
-    contextLabel = body.label;
+  const workspaceLabel =
+    typeof body.workspace === "string"
+      ? body.workspace.slice(0, 64)
+      : typeof body.label === "string"
+        ? body.label.slice(0, 64)
+        : undefined;
+  if (eventType === EventTypes.task_context_changed && workspaceLabel) {
+    contextLabel = workspaceLabel;
+  } else if (workspaceLabel && !contextLabel) {
+    contextLabel = workspaceLabel;
   }
 
+  const caps = providerCapability(hostProvider);
   const event = baseEvent(eventType as ActivityEvent["event_type"], {
     provider: hostProvider,
     session_id: typeof body.session_id === "string" ? body.session_id : undefined,
     status:
       eventType === EventTypes.task_context_changed ||
-      eventType === EventTypes.session_started
+      eventType === EventTypes.session_started ||
+      eventType === EventTypes.session_heartbeat
         ? "succeeded"
         : undefined,
-    metadata:
-      typeof body.file_path === "string"
-        ? {
-            file_path: String(body.file_path).slice(0, 512),
-            path_category: "workspace",
-            provider_name: providerCapability(hostProvider)?.label,
-            tier: providerCapability(hostProvider)?.tier,
-            daily_only: !providerCapability(hostProvider)?.hourly,
-          }
-        : {
-            provider_name: providerCapability(hostProvider)?.label,
-            tier: providerCapability(hostProvider)?.tier,
-            daily_only: !providerCapability(hostProvider)?.hourly,
-            ...(typeof body.label === "string"
-              ? { path_category: body.label.slice(0, 64) }
-              : {}),
-          },
+    metadata: {
+      provider_name: caps?.label,
+      tier: caps?.tier,
+      daily_only: caps ? !caps.hourly : true,
+      ...(workspaceLabel ? { path_category: workspaceLabel } : {}),
+      ...(typeof body.file_path === "string"
+        ? { file_path: String(body.file_path).slice(0, 512) }
+        : {}),
+    },
   });
   const clean = sanitizeEvent(event);
   if (clean) {
@@ -297,7 +305,7 @@ setInterval(() => {
 
 const port = config.port;
 app.listen({ port, host: "127.0.0.1" }).then(() => {
-  enqueueHeartbeat();
+  setTimeout(() => enqueueHeartbeat(), 3_000);
 }).catch((err) => {
   console.error(err);
   process.exit(1);

@@ -11,6 +11,7 @@ import { Callout } from "@/components/ui/Callout";
 import {
   ChartSkeleton,
   EmptyState,
+  emptyActivityVariant,
   ErrorState,
   NotFoundState,
   StatSkeleton,
@@ -64,7 +65,10 @@ export default function EmployeeDetailPage() {
   }, [d?.projects]);
 
   const recentEvents = useMemo<ActivityEventRow[]>(
-    () => (live.data?.recentEvents ?? []).filter(() => true).slice(0, 12),
+    () =>
+      (live.data?.recentEvents ?? [])
+        .filter((e) => e.event_type !== "heartbeat_sent")
+        .slice(0, 12),
     [live.data?.recentEvents],
   );
 
@@ -117,14 +121,8 @@ export default function EmployeeDetailPage() {
     );
   }
 
-  const worstConnector = (d?.devices ?? []).find((x) => x.state !== "online");
-  // "Connector offline" and "no activity observed" are different claims, and the
-  // PRD requires the interface to keep them apart (§12 required empty states).
-  const silenceVariant: "connector-offline" | "no-activity" =
-    (d?.devices.length ?? 0) === 0 ||
-    (d?.devices ?? []).every((dev) => dev.state === "offline")
-      ? "connector-offline"
-      : "no-activity";
+  const worstLive = (d?.devices ?? []).filter((x) => !x.isDemo).find((x) => x.state !== "online");
+  const silenceVariant = emptyActivityVariant(d?.devices ?? []);
 
   return (
     <AppShell
@@ -193,7 +191,7 @@ export default function EmployeeDetailPage() {
                 ) : (
                   d.devices.map((dev) => (
                     <span key={dev.deviceId} className="flex items-center gap-1.5">
-                      <ConnectorBadge state={dev.state} />
+                      <ConnectorBadge state={dev.state} demo={dev.isDemo} />
                       <span className="hint">
                         {dev.label ?? dev.provider} · {formatRelative(dev.lastHeartbeat)}
                       </span>
@@ -204,12 +202,12 @@ export default function EmployeeDetailPage() {
             </div>
           </Card>
 
-          {worstConnector ? (
+          {worstLive ? (
             <div className="mb-5">
               <Callout
-                tone={worstConnector.state === "offline" ? "bad" : "warn"}
+                tone={worstLive.state === "offline" ? "bad" : "warn"}
                 title={
-                  worstConnector.state === "paused"
+                  worstLive.state === "paused"
                     ? "Collection is paused on one connector"
                     : "Telemetry may be incomplete for this period"
                 }
@@ -486,10 +484,14 @@ export default function EmployeeDetailPage() {
             <Card>
               <CardHeader
                 title="Live activity feed"
-                subtitle="Most recent accepted events across the organisation"
+                subtitle="IDE companion events — connector heartbeats are omitted"
               />
               <CardBody className="pt-1">
-                <EventTimeline events={recentEvents} limit={10} />
+                <EventTimeline
+                  events={recentEvents}
+                  limit={10}
+                  emptyBody="Connector heartbeats are hidden here. Saves, edits, and sessions from any Cursor window with the Techlio companion will appear — chat-only Cursor use is not sent by the IDE."
+                />
               </CardBody>
             </Card>
           </section>

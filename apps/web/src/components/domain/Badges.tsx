@@ -2,7 +2,24 @@ import { Badge } from "@/components/ui/Badge";
 import { CONNECTOR_STATE, classificationOf, type ConnectorState } from "@/lib/vocab";
 import { providerMeta } from "@/lib/providers";
 
-export function ConnectorBadge({ state }: { state: ConnectorState }) {
+export function ConnectorBadge({
+  state,
+  demo,
+}: {
+  state: ConnectorState;
+  demo?: boolean;
+}) {
+  if (demo && (state === "online" || state === "stale")) {
+    return (
+      <Badge
+        tone="neutral"
+        dot
+        title="Seeded sample connector. This is not a live process check on this machine."
+      >
+        Demo sample
+      </Badge>
+    );
+  }
   const s = CONNECTOR_STATE[state] ?? CONNECTOR_STATE.offline;
   return (
     <Badge tone={s.tone} dot title={s.help}>

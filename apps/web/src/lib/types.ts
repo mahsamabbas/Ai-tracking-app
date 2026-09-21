@@ -132,6 +132,7 @@ export interface EmployeeDevice {
   queueDepth: number | null;
   paused: boolean;
   state: "online" | "stale" | "paused" | "offline";
+  isDemo?: boolean;
 }
 
 export interface SessionRow {
@@ -267,6 +268,7 @@ export interface LiveConnector {
   queueDepth: number | null;
   paused: boolean;
   state: "online" | "stale" | "paused" | "offline";
+  isDemo?: boolean;
 }
 
 export interface LiveStatus {

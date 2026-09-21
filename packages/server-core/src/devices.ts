@@ -1,7 +1,9 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { providerLabel } from "@techlio/event-schema";
 import { db } from "./db.js";
-import { auditLog, devices } from "./schema.js";
+import { auditLog, connectorHealth, devices } from "./schema.js";
+import { DEV_DEVELOPER_ALEX, DEV_ORG } from "./users.js";
 
 export function hashDeviceToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -14,8 +16,8 @@ export async function verifyDeviceToken(
   if (token === "dev-device-token") {
     return {
       ok: true,
-      organizationId: "550e8400-e29b-41d4-a716-446655440010",
-      developerId: "550e8400-e29b-41d4-a716-446655440011",
+      organizationId: DEV_ORG,
+      developerId: DEV_DEVELOPER_ALEX,
     };
   }
   const hash = hashDeviceToken(token);
@@ -98,4 +100,95 @@ export async function getDevice(
     .from(devices)
     .where(and(eq(devices.id, deviceId), eq(devices.organizationId, organizationId)));
   return rows[0] ?? null;
+}
+
+/**
+ * A heartbeat from the local connector is proof that *this* device is running.
+ * Seeded sample tools for the same person (e.g. Claude Code on Alex) are not
+ * a process check — they get frozen so the dashboard cannot show them online.
+ */
+export async function recordLiveHeartbeat(input: {
+  deviceId: string;
+  organizationId: string;
+  developerId: string;
+  version?: string | null;
+  queueDepth?: number | null;
+  paused?: boolean;
+  provider?: string | null;
+  tokenHash?: string;
+}): Promise<void> {
+  const now = new Date();
+  const provider = input.provider ?? null;
+
+  await db
+    .insert(devices)
+    .values({
+      id: input.deviceId,
+      organizationId: input.organizationId,
+      developerId: input.developerId,
+      tokenHash: input.tokenHash ?? hashDeviceToken("live-heartbeat"),
+      provider,
+      label: provider ? `${providerLabel(provider)} (this machine)` : "This machine",
+      createdAt: now,
+    })
+    .onConflictDoUpdate({
+      target: devices.id,
+      set: {
+        revokedAt: null,
+        ...(provider ? { provider } : {}),
+      },
+    });
+
+  await db
+    .insert(connectorHealth)
+    .values({
+      deviceId: input.deviceId,
+      organizationId: input.organizationId,
+      lastHeartbeat: now,
+      version: input.version ?? "unknown",
+      queueDepth: input.queueDepth ?? 0,
+      paused: input.paused ? 1 : 0,
+      provider,
+      demoState: null,
+    })
+    .onConflictDoUpdate({
+      target: connectorHealth.deviceId,
+      set: {
+        lastHeartbeat: now,
+        version: input.version ?? "unknown",
+        queueDepth: input.queueDepth ?? 0,
+        paused: input.paused ? 1 : 0,
+        provider,
+        demoState: null,
+      },
+    });
+
+  await db.execute(sql`
+    UPDATE connector_health AS ch
+    SET last_heartbeat = NULL,
+        demo_state = 'offline'
+    FROM devices AS sibling
+    WHERE sibling.id = ch.device_id
+      AND sibling.developer_id = ${input.developerId}
+      AND sibling.id <> ${input.deviceId}
+      AND sibling.revoked_at IS NULL
+      AND ch.demo_state IS NOT NULL
+      AND ch.demo_state <> 'offline'
+  `);
+
+  if (provider) {
+    await db.execute(sql`
+      UPDATE devices
+      SET revoked_at = ${now}
+      WHERE developer_id = ${input.developerId}
+        AND organization_id = ${input.organizationId}
+        AND id <> ${input.deviceId}
+        AND revoked_at IS NULL
+        AND provider = ${provider}
+        AND EXISTS (
+          SELECT 1 FROM connector_health ch
+          WHERE ch.device_id = devices.id AND ch.demo_state IS NOT NULL
+        )
+    `);
+  }
 }

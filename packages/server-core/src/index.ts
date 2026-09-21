@@ -17,3 +17,4 @@ export * from "./range.js";
 export * from "./seed.js";
 export { sql } from "drizzle-orm";
 export * from "./demo-keepalive.js";
+export * from "./connector-state.js";

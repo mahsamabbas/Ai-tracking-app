@@ -3,7 +3,8 @@
   "displayName": "Techlio AI Activity Companion",
   "version": "0.1.0",
   "private": true,
-  "engines": { "vscode": "^1.85.0" },
+  "publisher": "techlio",
+  "engines": { "vscode": "^1.96.0" },
   "categories": ["Other"],
   "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
@@ -16,6 +17,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "package": "npx --yes @vscode/vsce package --no-dependencies --allow-missing-repository",
     "lint": "echo ok"
   },
   "devDependencies": {

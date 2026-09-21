@@ -156,7 +156,7 @@ On activate it posts `http://127.0.0.1:9477/host` so the connector labels the pr
 
 ```text
  Developer machine                              Techlio services
- ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
  │ IDE companion   │────▶│ Local connector  │────▶│ API (NestJS)    │
  │ Cursor / VS Code│     │ :9477 Fastify    │     │ :3001           │
  └─────────────────┘     │ encrypted SQLite │     └────────┬────────┘
@@ -169,11 +169,11 @@ On activate it posts `http://127.0.0.1:9477/host` so the connector labels the pr
  ┌─────────────────┐     ┌──────────────────┐     │ audit_log       │
  │ Worker (BullMQ) │◀───▶│ Redis            │     └────────┬────────┘
  │ :05 UTC hourly  │     └──────────────────┘              │
- └─────────────────┘                                       ▼
-                                                  ┌─────────────────┐
+└─────────────────┘                                       ▼
+                                                 ┌─────────────────┐
                                                   │ Web (Next.js)   │
                                                   │ :3000           │
-                                                  └─────────────────┘
+                                                 └─────────────────┘
 ```
 
 **Two ingest paths**
@@ -490,8 +490,8 @@ Useful root scripts: `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm dev`, `pnpm d
 
 From the PRD and `.cursor/rules/privacy-guardrails.mdc`:
 
-1. **Allowlist metadata** — no arbitrary JSON on events.
-2. **Idempotent ingest** — same `event_id` never double-counts.
+1. **Allowlist metadata** — no arbitrary JSON on events.  
+2. **Idempotent ingest** — same `event_id` never double-counts.  
 3. **Five durations** — never collapse them in the UI.
 4. **Hour boundary** — `occurred_at`; late data → new snapshot version.
 5. **Coverage gaps** — pause / offline / stale heartbeat are explicit states (`offline`, `paused`, `stale`, `online`). Required empty states also include: no activity observed, provider does not expose this metric, events delayed, no task selected.

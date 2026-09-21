@@ -9,6 +9,7 @@ import { Callout } from "@/components/ui/Callout";
 import {
   ChartSkeleton,
   EmptyState,
+  emptyActivityVariant,
   ErrorState,
   StatSkeleton,
 } from "@/components/ui/States";
@@ -90,6 +91,8 @@ export default function OverviewPage() {
   );
 
   const hasActivity = (t?.sessions ?? 0) > 0;
+  const liveConnectors = live.data?.connectors ?? [];
+  const emptyVariant = emptyActivityVariant(liveConnectors);
   const coverage = d?.coverage;
   const coverageIssues =
     (coverage?.staleConnectors ?? 0) +
@@ -171,16 +174,31 @@ export default function OverviewPage() {
           </div>
         </>
       ) : !hasActivity ? (
-        <Card>
-          <EmptyState
-            variant={coverageIssues > 0 ? "connector-offline" : "no-activity"}
-            action={
-              <button type="button" className="btn-ghost" onClick={() => setRange({ preset: "30d" })}>
-                Widen to 30 days
-              </button>
-            }
-          />
-        </Card>
+        <>
+          {liveConnectors.length > 0 ? (
+            <Card className="mb-5">
+              <div className="flex flex-wrap items-center gap-3 p-5">
+                {liveConnectors.map((c) => (
+                  <span key={c.deviceId} className="flex items-center gap-1.5">
+                    <ConnectorBadge state={c.state} demo={c.isDemo} />
+                    <ProviderBadge provider={c.provider} size="sm" />
+                    <span className="hint">{formatRelative(c.lastHeartbeat)}</span>
+                  </span>
+                ))}
+              </div>
+            </Card>
+          ) : null}
+          <Card>
+            <EmptyState
+              variant={emptyVariant}
+              action={
+                <button type="button" className="btn-ghost" onClick={() => setRange({ preset: "30d" })}>
+                  Widen to 30 days
+                </button>
+              }
+            />
+          </Card>
+        </>
       ) : (
         <>
           {/* ---------------- KPI row ---------------- */}
@@ -485,7 +503,7 @@ export default function OverviewPage() {
                             <ProviderBadge provider={c.provider} size="sm" />
                           </td>
                           <td>
-                            <ConnectorBadge state={c.state} />
+                            <ConnectorBadge state={c.state} demo={c.isDemo} />
                           </td>
                           <td className="num text-sm text-ink-500">
                             {formatRelative(c.lastHeartbeat)}

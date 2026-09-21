@@ -2,6 +2,7 @@ import type { ActivityEvent } from "@techlio/event-schema";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { agentSessions, sessionContextVersions } from "./schema.js";
+import { recomputeSessionMetrics } from "./sessions.js";
 
 const SESSION_END = new Set(["session_ended", "connector_stopped"]);
 
@@ -65,5 +66,13 @@ export async function applySessionization(event: ActivityEvent): Promise<void> {
           eq(agentSessions.organizationId, event.organization_id),
         ),
       );
+  }
+
+  if (event.event_type !== "heartbeat_sent") {
+    await db
+      .update(agentSessions)
+      .set({ lastEventAt: new Date(event.occurred_at) })
+      .where(eq(agentSessions.id, sessionId));
+    await recomputeSessionMetrics(event.organization_id, sessionId);
   }
 }

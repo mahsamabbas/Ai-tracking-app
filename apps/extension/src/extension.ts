@@ -2,12 +2,38 @@ import * as vscode from "vscode";
 
 const CONNECTOR = "http://127.0.0.1:9477";
 const SESSION_ID = globalThis.crypto.randomUUID();
+const EDIT_THROTTLE_MS = 30_000;
+const SESSION_PULSE_MS = 120_000;
 
 function hostProvider(): string {
   const name = vscode.env.appName.toLowerCase();
   if (name.includes("cursor")) return "cursor";
   if (name.includes("visual studio code")) return "vscode";
   return "cursor";
+}
+
+function workspaceName(uri?: vscode.Uri): string {
+  const folder = uri
+    ? vscode.workspace.getWorkspaceFolder(uri)
+    : vscode.workspace.workspaceFolders?.[0];
+  const name = folder?.name ?? vscode.workspace.name;
+  return (name ?? "untitled").slice(0, 64);
+}
+
+function relativePath(uri: vscode.Uri): string {
+  return vscode.workspace.asRelativePath(uri).slice(0, 512);
+}
+
+function shouldIgnore(uri: vscode.Uri): boolean {
+  const s = uri.scheme;
+  if (s !== "file") return true;
+  const p = uri.fsPath.replace(/\\/g, "/");
+  return (
+    p.includes("/node_modules/") ||
+    p.includes("/.git/") ||
+    p.includes("/.next/") ||
+    p.includes("/dist/")
+  );
 }
 
 async function postJson(path: string, body: Record<string, unknown>): Promise<void> {
@@ -18,7 +44,7 @@ async function postJson(path: string, body: Record<string, unknown>): Promise<vo
       body: JSON.stringify(body),
     });
   } catch {
-    /* connector offline — queue on next retry when it is up */
+    /* connector offline — retry on the next event */
   }
 }
 
@@ -27,6 +53,7 @@ async function postExtensionEvent(body: Record<string, unknown>): Promise<void> 
     session_id: SESSION_ID,
     provider: hostProvider(),
     appName: vscode.env.appName,
+    workspace: workspaceName(),
     ...body,
   });
 }
@@ -37,13 +64,20 @@ export function activate(context: vscode.ExtensionContext) {
     100,
   );
   status.text = `Techlio: ${hostProvider()}`;
+  status.tooltip = "Reporting allowlisted IDE activity to the local Techlio connector";
   status.show();
 
   void postJson("/host", {
     provider: hostProvider(),
     appName: vscode.env.appName,
+    workspace: workspaceName(),
   });
-  void postExtensionEvent({ event_type: "session_started" });
+  void postExtensionEvent({
+    event_type: "session_started",
+    label: workspaceName(),
+  });
+
+  const lastEditAt = new Map<string, number>();
 
   context.subscriptions.push(
     vscode.commands.registerCommand("techlio.pauseCollection", async () => {
@@ -76,10 +110,68 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
-      const rel = vscode.workspace.asRelativePath(doc.uri);
+      if (shouldIgnore(doc.uri)) return;
       void postExtensionEvent({
         event_type: "file_modified",
-        file_path: rel.slice(0, 512),
+        file_path: relativePath(doc.uri),
+        workspace: workspaceName(doc.uri),
+        label: workspaceName(doc.uri),
+      });
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidCreateFiles((e) => {
+      for (const file of e.files) {
+        if (shouldIgnore(file)) continue;
+        void postExtensionEvent({
+          event_type: "file_created",
+          file_path: relativePath(file),
+          workspace: workspaceName(file),
+          label: workspaceName(file),
+        });
+      }
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidDeleteFiles((e) => {
+      for (const file of e.files) {
+        if (shouldIgnore(file)) continue;
+        void postExtensionEvent({
+          event_type: "file_deleted",
+          file_path: relativePath(file),
+          workspace: workspaceName(file),
+          label: workspaceName(file),
+        });
+      }
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      const uri = e.document.uri;
+      if (shouldIgnore(uri) || e.contentChanges.length === 0) return;
+      const key = uri.toString();
+      const now = Date.now();
+      const prev = lastEditAt.get(key) ?? 0;
+      if (now - prev < EDIT_THROTTLE_MS) return;
+      lastEditAt.set(key, now);
+      void postExtensionEvent({
+        event_type: "file_modified",
+        file_path: relativePath(uri),
+        workspace: workspaceName(uri),
+        label: workspaceName(uri),
+      });
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      void postExtensionEvent({
+        event_type: "task_context_changed",
+        label: workspaceName(),
+        workspace: workspaceName(),
       });
     }),
   );
@@ -94,10 +186,22 @@ export function activate(context: vscode.ExtensionContext) {
       if (eventType) {
         void postExtensionEvent({
           event_type: eventType,
+          label: workspaceName(),
+          workspace: workspaceName(),
         });
       }
     }),
   );
+
+  const pulse = setInterval(() => {
+    if (!vscode.window.state.focused) return;
+    void postExtensionEvent({
+      event_type: "session_heartbeat",
+      label: workspaceName(),
+      workspace: workspaceName(),
+    });
+  }, SESSION_PULSE_MS);
+  context.subscriptions.push({ dispose: () => clearInterval(pulse) });
 }
 
 export function deactivate() {

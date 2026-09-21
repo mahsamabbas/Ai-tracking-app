@@ -9,7 +9,7 @@ export const CONNECTOR_STATE: Record<
   online: {
     label: "Online",
     tone: "ok",
-    help: "Heartbeat received within the last 5 minutes.",
+    help: "A real heartbeat from this device in the last 5 minutes.",
   },
   stale: {
     label: "Stale",

@@ -38,6 +38,7 @@ export interface LiveConnector {
   queueDepth: number | null;
   paused: boolean;
   state: "online" | "stale" | "paused" | "offline";
+  isDemo: boolean;
 }
 
 export interface LiveAlert {
@@ -85,14 +86,16 @@ export class DashboardController {
       last_heartbeat: Date | null;
       queue_depth: number | null;
       paused: number | null;
+      demo_state: string | null;
     }>(sql`
       SELECT d.id AS device_id, d.developer_id, e.display_name, e.team,
              COALESCE(ch.provider, d.provider) AS provider,
-             ch.version, ch.last_heartbeat, ch.queue_depth, ch.paused
+             ch.version, ch.last_heartbeat, ch.queue_depth, ch.paused, ch.demo_state
       FROM devices d
       JOIN employees e ON e.id = d.developer_id
       LEFT JOIN connector_health ch ON ch.device_id = d.id
       WHERE d.organization_id = ${user.organizationId} AND d.revoked_at IS NULL
+        AND ch.demo_state IS DISTINCT FROM 'offline'
         ${selfOnly !== null ? sql`AND d.developer_id = ${selfOnly}` : sql``}
       ORDER BY e.display_name ASC
     `);
@@ -118,6 +121,7 @@ export class DashboardController {
         queueDepth: r.queue_depth,
         paused,
         state,
+        isDemo: r.demo_state != null,
       };
     });
 

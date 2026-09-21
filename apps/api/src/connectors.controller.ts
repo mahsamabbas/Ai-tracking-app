@@ -17,6 +17,8 @@ import {
   registerDevice,
   revokeDevice,
   verifyDeviceToken,
+  recordLiveHeartbeat,
+  hashDeviceToken,
   ingestBatch,
   getDevice,
   canPauseConnector,
@@ -96,27 +98,16 @@ export class ConnectorsController {
     const verified = await verifyDeviceToken(id, token);
     if (!verified.ok) throw new UnauthorizedException();
 
-    await db
-      .insert(connectorHealth)
-      .values({
-        deviceId: id,
-        organizationId: verified.organizationId!,
-        lastHeartbeat: new Date(),
-        version: body.version ?? "unknown",
-        queueDepth: body.queueDepth ?? 0,
-        paused: body.paused ? 1 : 0,
-        provider: body.provider ?? null,
-      })
-      .onConflictDoUpdate({
-        target: connectorHealth.deviceId,
-        set: {
-          lastHeartbeat: new Date(),
-          version: body.version ?? "unknown",
-          queueDepth: body.queueDepth ?? 0,
-          paused: body.paused ? 1 : 0,
-          provider: body.provider ?? null,
-        },
-      });
+    await recordLiveHeartbeat({
+      deviceId: id,
+      organizationId: verified.organizationId!,
+      developerId: verified.developerId ?? DEV_DEVELOPER,
+      version: body.version ?? "unknown",
+      queueDepth: body.queueDepth ?? 0,
+      paused: Boolean(body.paused),
+      provider: body.provider ?? null,
+      tokenHash: hashDeviceToken(token),
+    });
 
     return { ok: true };
   }

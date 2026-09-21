@@ -9,15 +9,19 @@ export async function uploadBatch(
 ): Promise<boolean> {
   const body = JSON.stringify({ events });
   const signature = await signBody(privateKey, body);
-  const res = await fetch(`${apiBase}/v1/events/batch`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${deviceToken}`,
-      "X-Signature": signature,
-      "X-Device-Id": events[0]?.device_id ?? "",
-    },
-    body,
-  });
-  return res.ok;
+  try {
+    const res = await fetch(`${apiBase}/v1/events/batch`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${deviceToken}`,
+        "X-Signature": signature,
+        "X-Device-Id": events[0]?.device_id ?? "",
+      },
+      body,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
