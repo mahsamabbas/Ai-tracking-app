@@ -23,8 +23,21 @@ export function TrendChart({
   height?: number;
   emptyVariant?: EmptyVariant;
 }) {
-  const isEmpty = data.every((d) => d.activeMs === 0 && d.idleMs === 0);
+  const hasTime = data.some((d) => d.activeMs > 0 || d.idleMs > 0);
+  const hasSessions = data.some((d) => d.sessions > 0);
+  const isEmpty = !hasTime && !hasSessions;
   const maxMs = Math.max(...data.map((d) => Math.max(d.activeMs, d.idleMs)), 0);
+  if (!hasTime && hasSessions) {
+    return (
+      <div className="flex h-[220px] flex-col items-center justify-center px-6 text-center">
+        <p className="text-sm font-medium text-ink-900">Companion activity is recorded</p>
+        <p className="hint mt-1 max-w-md">
+          File saves and session signals are on this page, but Cursor does not report model or
+          tool duration. This chart stays at zero until an agent reports timed operations.
+        </p>
+      </div>
+    );
+  }
   return (
     <ChartFrame height={height} isEmpty={isEmpty} emptyVariant={emptyVariant}>
       <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>

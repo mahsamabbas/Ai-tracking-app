@@ -1,10 +1,20 @@
+import { createHash } from "node:crypto";
 import type { ActivityEvent } from "@techlio/event-schema";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "./db.js";
-import { agentSessions, sessionContextVersions } from "./schema.js";
+import { activityEvents, agentSessions, sessionContextVersions } from "./schema.js";
 import { recomputeSessionMetrics } from "./sessions.js";
 
 const SESSION_END = new Set(["session_ended", "connector_stopped"]);
+
+/** Stable session id so one developer's events never attach to another person's session. */
+function sessionIdForDeveloper(developerId: string, sessionId: string): string {
+  const bytes = createHash("sha256").update(`${developerId}:${sessionId}`).digest();
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.subarray(0, 16).toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
 
 /**
  * FR-017 — groups events into sessions by developer, device, provider, and
@@ -12,8 +22,32 @@ const SESSION_END = new Set(["session_ended", "connector_stopped"]);
  * `session_started` never loses the activity that follows it.
  */
 export async function applySessionization(event: ActivityEvent): Promise<void> {
-  const sessionId = event.session_id;
+  let sessionId = event.session_id;
   if (!sessionId) return;
+
+  const owner = await db
+    .select({ developerId: agentSessions.developerId })
+    .from(agentSessions)
+    .where(eq(agentSessions.id, sessionId));
+  if (owner[0] && owner[0].developerId !== event.developer_id) {
+    const remapped = sessionIdForDeveloper(event.developer_id, sessionId);
+    await db
+      .update(activityEvents)
+      .set({
+        sessionId: remapped,
+        payload: sql`${activityEvents.payload} || jsonb_build_object('session_id', ${remapped}::text)`,
+      })
+      .where(
+        and(
+          eq(activityEvents.organizationId, event.organization_id),
+          eq(activityEvents.developerId, event.developer_id),
+          eq(activityEvents.sessionId, sessionId),
+        ),
+      );
+    const foreignSessionId = sessionId;
+    sessionId = remapped;
+    await recomputeSessionMetrics(event.organization_id, foreignSessionId);
+  }
 
   await db
     .insert(agentSessions)

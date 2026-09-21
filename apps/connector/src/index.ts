@@ -25,9 +25,9 @@ import { uploadBatch } from "./uploader.js";
 let paused = false;
 /** Actual host agent — declared by the IDE companion, not hardcoded as Claude. */
 let hostProvider = config.provider;
-let activeSessionId: string | undefined;
 let contextLabel: string | undefined;
 let identity: ConnectorIdentity | null = loadIdentity();
+let activeSessionId: string | undefined = identity ? crypto.randomUUID() : undefined;
 let flushing = false;
 
 function defaultStatus(
@@ -257,6 +257,7 @@ app.post("/claim", async (req, reply) => {
       consentAccepted: true,
       consentVersion: config.consentVersion,
     });
+    activeSessionId = crypto.randomUUID();
     queue.clear();
     if (identity.provider) hostProvider = identity.provider;
     enqueueHeartbeat();
@@ -278,6 +279,7 @@ app.post("/claim", async (req, reply) => {
 app.post("/unpair", async () => {
   clearIdentity();
   identity = null;
+  activeSessionId = undefined;
   queue.clear();
   return { paired: false as const };
 });
@@ -376,7 +378,7 @@ app.post("/hooks/extension", async (req) => {
   const caps = providerCapability(hostProvider);
   const event = baseEvent(eventType as ActivityEvent["event_type"], {
     provider: hostProvider,
-    session_id: typeof body.session_id === "string" ? body.session_id : undefined,
+    session_id: activeSessionId,
     status:
       eventType === EventTypes.task_context_changed ||
       eventType === EventTypes.session_started ||
