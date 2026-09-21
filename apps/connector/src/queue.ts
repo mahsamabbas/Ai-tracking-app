@@ -1,4 +1,5 @@
-import Database from "better-sqlite3";
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { dirname } from "node:path";
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
 import type { ActivityEvent } from "@techlio/event-schema";
 
@@ -9,85 +10,102 @@ export type PendingBatch = {
   events: ActivityEvent[];
 };
 
+type StoredRow = { id: number; payload: string; created_at: string };
+type StoreFile = { nextId: number; rows: StoredRow[] };
+
 function deriveKey(secret: string): Buffer {
   return scryptSync(secret, "techlio-connector", 32);
 }
 
+/**
+ * Encrypted on-disk queue. Plain JSON so Windows/macOS installs do not compile
+ * native addons (no Visual Studio / node-gyp).
+ */
 export class EncryptedQueue {
-  private db: Database.Database;
+  private path: string;
   private key: Buffer;
+  private rows: StoredRow[] = [];
+  private nextId = 1;
 
   constructor(path: string, secret: string) {
-    this.db = new Database(path);
+    this.path = path;
     this.key = deriveKey(secret);
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS pending (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        payload BLOB NOT NULL,
-        created_at TEXT NOT NULL
-      );
-    `);
+    mkdirSync(dirname(path), { recursive: true });
+    this.load();
   }
 
-  private encrypt(text: string): Buffer {
+  private load(): void {
+    if (!existsSync(this.path)) return;
+    try {
+      const parsed = JSON.parse(readFileSync(this.path, "utf8")) as StoreFile;
+      this.rows = Array.isArray(parsed.rows) ? parsed.rows : [];
+      this.nextId = Number(parsed.nextId) || this.rows.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+    } catch {
+      this.rows = [];
+      this.nextId = 1;
+    }
+  }
+
+  private save(): void {
+    const body: StoreFile = { nextId: this.nextId, rows: this.rows };
+    writeFileSync(this.path, JSON.stringify(body));
+  }
+
+  private encrypt(text: string): string {
     const iv = randomBytes(12);
     const cipher = createCipheriv(ALGO, this.key, iv);
     const enc = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
     const tag = cipher.getAuthTag();
-    return Buffer.concat([iv, tag, enc]);
+    return Buffer.concat([iv, tag, enc]).toString("base64");
   }
 
-  private decrypt(buf: Buffer): string {
+  private decrypt(encoded: string): string {
+    const buf = Buffer.from(encoded, "base64");
     const iv = buf.subarray(0, 12);
     const tag = buf.subarray(12, 28);
     const data = buf.subarray(28);
     const decipher = createDecipheriv(ALGO, this.key, iv);
     decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(data), decipher.final()]).toString(
-      "utf8",
-    );
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
   }
 
   enqueue(events: ActivityEvent[]): void {
-    const stmt = this.db.prepare(
-      "INSERT INTO pending (payload, created_at) VALUES (?, ?)",
-    );
-    const blob = this.encrypt(JSON.stringify(events));
-    stmt.run(blob, new Date().toISOString());
+    this.rows.push({
+      id: this.nextId++,
+      payload: this.encrypt(JSON.stringify(events)),
+      created_at: new Date().toISOString(),
+    });
+    this.save();
   }
 
   peekBatch(limit = 100): PendingBatch {
-    const rows = this.db
-      .prepare(
-        "SELECT id, payload FROM pending ORDER BY id ASC LIMIT ?",
-      )
-      .all(limit) as { id: number; payload: Buffer }[];
+    const slice = this.rows.slice(0, limit);
     const events: ActivityEvent[] = [];
     const rowIds: number[] = [];
-    const del = this.db.prepare("DELETE FROM pending WHERE id = ?");
-    for (const row of rows) {
+    const drop = new Set<number>();
+    for (const row of slice) {
       try {
         const parsed = JSON.parse(this.decrypt(row.payload)) as ActivityEvent[];
         events.push(...parsed);
         rowIds.push(row.id);
       } catch {
-        // An unreadable row can never be delivered and must not block newer rows.
-        del.run(row.id);
+        drop.add(row.id);
       }
+    }
+    if (drop.size) {
+      this.rows = this.rows.filter((row) => !drop.has(row.id));
+      this.save();
     }
     return { rowIds, events };
   }
 
   acknowledge(rowIds: number[]): void {
     if (rowIds.length === 0) return;
-    const del = this.db.prepare("DELETE FROM pending WHERE id = ?");
-    const remove = this.db.transaction((ids: number[]) => {
-      for (const id of ids) del.run(id);
-    });
-    remove(rowIds);
+    const gone = new Set(rowIds);
+    this.rows = this.rows.filter((row) => !gone.has(row.id));
+    this.save();
   }
 
-  /** Compatibility helper. Prefer peekBatch + acknowledge for uploads. */
   dequeueBatch(limit = 100): ActivityEvent[] {
     const batch = this.peekBatch(limit);
     this.acknowledge(batch.rowIds);
@@ -95,13 +113,11 @@ export class EncryptedQueue {
   }
 
   depth(): number {
-    const row = this.db
-      .prepare("SELECT COUNT(*) as c FROM pending")
-      .get() as { c: number };
-    return row.c;
+    return this.rows.length;
   }
 
   clear(): void {
-    this.db.exec("DELETE FROM pending");
+    this.rows = [];
+    this.save();
   }
 }

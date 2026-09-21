@@ -60,7 +60,7 @@ export function ConnectorInstallGuide() {
             teammate installs once on their own machine — your install does not track anyone else.
           </p>
           {platform === "mac" || platform === "windows" ? (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <a
                 href={
                   platform === "windows"
@@ -72,37 +72,43 @@ export function ConnectorInstallGuide() {
                     ? "install-connector-windows.ps1"
                     : "install-connector-macos.sh"
                 }
-                className="btn-primary h-9 text-xs"
+                className="btn-primary h-9 whitespace-nowrap text-xs"
               >
                 {platform === "windows" ? "Download Windows installer" : "Download macOS installer"}
               </a>
-              <button type="button" className="btn-ghost h-9 text-xs" onClick={() => void copyCommand()}>
-                {copied ? "Copied" : platform === "windows" ? "Copy PowerShell command" : "Copy Terminal command"}
+              <button
+                type="button"
+                className="btn-ghost h-9 whitespace-nowrap text-xs"
+                onClick={() => void copyCommand()}
+              >
+                {copied ? "Copied" : "Copy command"}
               </button>
-              <button type="button" className="btn-ghost h-9 text-xs" onClick={() => void refresh()}>
+              <button
+                type="button"
+                className="btn-ghost h-9 whitespace-nowrap text-xs"
+                onClick={() => void refresh()}
+              >
                 Check if running
               </button>
             </div>
           ) : (
-            <p className="mt-2 text-xs text-ink-700">
-              Use the Windows or macOS installer on a supported PC, or run{" "}
-              <code className="code-inline">pnpm dev:connector</code> from the project repo.
+            <p className="mt-2 text-xs leading-relaxed text-ink-700">
+              Use the Windows or macOS installer on this computer.
             </p>
           )}
           {platform === "mac" || platform === "windows" ? (
-            <p className="mt-2 text-xs text-ink-700">
-              Prerequisites: only{" "}
+            <p className="mt-2 text-xs leading-relaxed text-ink-700">
+              You only need{" "}
               <a
                 href="https://nodejs.org"
-                className="font-medium text-brand-700 underline dark:text-brand-400"
+                className="font-medium text-brand-700 underline dark:text-brand-300"
                 target="_blank"
                 rel="noreferrer"
               >
-                Node.js 20+
+                Node.js 20 or newer
               </a>
-              . The installer downloads the agent from this site (no git clone), installs to{" "}
-              <code className="code-inline">~/.techlio/connector</code>, and keeps port 9477 running
-              at sign-in.
+              . No Visual Studio, no project clone. The script installs the agent under your home
+              folder and starts it at sign-in.
             </p>
           ) : null}
           {online === false ? (

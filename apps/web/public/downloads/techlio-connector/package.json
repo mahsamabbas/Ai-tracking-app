@@ -1,8 +1,5 @@
 {
   "name": "techlio-connector",
   "private": true,
-  "type": "module",
-  "dependencies": {
-    "better-sqlite3": "11.7.0"
-  }
+  "type": "module"
 }

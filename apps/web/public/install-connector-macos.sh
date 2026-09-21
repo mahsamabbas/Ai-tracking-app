@@ -7,11 +7,7 @@ INSTALL_DIR="${TECHLIO_INSTALL_DIR:-$HOME/.techlio/connector}"
 BUNDLE_URL="${TECHLIO_SITE}/downloads/techlio-connector.zip"
 
 command -v node >/dev/null 2>&1 || {
-  echo "Install Node.js 20+ from https://nodejs.org then run this script again."
-  exit 1
-}
-command -v npm >/dev/null 2>&1 || {
-  echo "npm is required (comes with Node.js)."
+  echo "Install Node.js 20 or newer from https://nodejs.org then run this script again."
   exit 1
 }
 
@@ -41,9 +37,6 @@ elif [[ ! -f "$INSTALL_DIR/.env" ]]; then
 fi
 
 chmod +x "$INSTALL_DIR/run.sh"
-echo "Installing dependencies (one-time)…"
-(cd "$INSTALL_DIR" && npm install --omit=dev)
-
 RUNNER="$INSTALL_DIR/run.sh"
 LABEL="com.techlio.connector"
 PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
@@ -77,6 +70,19 @@ launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl enable "gui/$(id -u)/${LABEL}"
 launchctl kickstart -k "gui/$(id -u)/${LABEL}"
+
+ok=0
+for _ in 1 2 3 4 5 6 7 8; do
+  if curl -fsS "http://127.0.0.1:9477/health" >/dev/null 2>&1; then
+    ok=1
+    break
+  fi
+  sleep 0.5
+done
+if [[ "$ok" != 1 ]]; then
+  echo "The connector did not start. See $HOME/.techlio-connector/connector.err.log"
+  exit 1
+fi
 
 echo ""
 echo "Done. Connector runs at http://127.0.0.1:9477"

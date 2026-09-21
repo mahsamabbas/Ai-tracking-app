@@ -137,7 +137,7 @@
     @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
   }
   .code-snippet {
-    @apply mt-2 overflow-x-auto rounded-lg border border-slate-600 bg-slate-900 px-3 py-2.5 font-mono text-xs leading-relaxed text-slate-50 shadow-inner;
+    @apply mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-slate-600 bg-slate-900 px-3 py-2.5 font-mono text-xs leading-relaxed text-slate-50 shadow-inner;
   }
   .code-inline {
     @apply rounded bg-slate-200 px-1 py-0.5 font-mono text-[11px] text-slate-900 dark:bg-slate-800 dark:text-slate-100;

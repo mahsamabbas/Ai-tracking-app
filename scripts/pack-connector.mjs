@@ -26,8 +26,6 @@ const built = spawnSync(
     "--format=esm",
     "--target=node20",
     `--outfile=${join(out, "agent.mjs")}`,
-    "--external:better-sqlite3",
-    "--banner:js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
   ],
   { cwd: root, stdio: "inherit" },
 );
@@ -40,7 +38,6 @@ writeFileSync(
       name: "techlio-connector",
       private: true,
       type: "module",
-      dependencies: { "better-sqlite3": "11.7.0" },
     },
     null,
     2,

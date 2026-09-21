@@ -34,11 +34,9 @@ export default function SetupConnectorPage() {
     >
       <div className="mb-5 space-y-4" data-onboarding="onboard-welcome">
         <OnboardingStepper />
-        <Callout tone="warn" title="Local agent is mandatory">
-          Techlio only works when a small program on <strong>this</strong> Mac or PC collects AI
-          tool activity and uploads it with your assigned key. Use the{" "}
-          <strong>Install agent</strong> item in the sidebar anytime; optional{" "}
-          <strong>Show guided tour</strong> below for step-by-step pointers.
+        <Callout tone="warn" title="Install the agent on this computer">
+          Open <strong>Install agent</strong> in the sidebar, run the command below once, then
+          activate your key on <strong>My connectors</strong>.
         </Callout>
         <ThisComputerStatus />
         <ConnectorInstallGuide />

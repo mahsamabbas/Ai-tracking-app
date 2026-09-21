@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -8511,7 +8510,7 @@ var require_transport = __commonJS({
   "node_modules/.pnpm/pino@10.3.1/node_modules/pino/lib/transport.js"(exports, module) {
     "use strict";
     var { createRequire } = __require("module");
-    var { existsSync: existsSync4 } = __require("node:fs");
+    var { existsSync: existsSync5 } = __require("node:fs");
     var getCallers = require_caller();
     var { join: join4, isAbsolute, sep } = __require("node:path");
     var { fileURLToPath: fileURLToPath2 } = __require("node:url");
@@ -8585,7 +8584,7 @@ var require_transport = __commonJS({
           return false;
         }
       }
-      return isAbsolute(path) && !existsSync4(path);
+      return isAbsolute(path) && !existsSync5(path);
     }
     function stripQuotes(value) {
       const first = value[0];
@@ -36951,8 +36950,8 @@ ${body}`);
 
 // apps/connector/src/index.ts
 var import_fastify = __toESM(require_fastify(), 1);
-import { mkdirSync as mkdirSync3 } from "node:fs";
-import { dirname as dirname3 } from "node:path";
+import { mkdirSync as mkdirSync4 } from "node:fs";
+import { dirname as dirname4 } from "node:path";
 
 // packages/event-schema/dist/catalog.js
 var SCHEMA_VERSION = "1.0.0";
@@ -42692,88 +42691,100 @@ async function claimFromPortal(input) {
 }
 
 // apps/connector/src/queue.ts
-import Database from "better-sqlite3";
+import { mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync2, existsSync as existsSync3 } from "node:fs";
+import { dirname as dirname2 } from "node:path";
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
 var ALGO = "aes-256-gcm";
 function deriveKey(secret) {
   return scryptSync(secret, "techlio-connector", 32);
 }
 var EncryptedQueue = class {
-  db;
+  path;
   key;
+  rows = [];
+  nextId = 1;
   constructor(path, secret) {
-    this.db = new Database(path);
+    this.path = path;
     this.key = deriveKey(secret);
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS pending (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        payload BLOB NOT NULL,
-        created_at TEXT NOT NULL
-      );
-    `);
+    mkdirSync2(dirname2(path), { recursive: true });
+    this.load();
+  }
+  load() {
+    if (!existsSync3(this.path)) return;
+    try {
+      const parsed = JSON.parse(readFileSync3(this.path, "utf8"));
+      this.rows = Array.isArray(parsed.rows) ? parsed.rows : [];
+      this.nextId = Number(parsed.nextId) || this.rows.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+    } catch {
+      this.rows = [];
+      this.nextId = 1;
+    }
+  }
+  save() {
+    const body = { nextId: this.nextId, rows: this.rows };
+    writeFileSync2(this.path, JSON.stringify(body));
   }
   encrypt(text) {
     const iv = randomBytes(12);
     const cipher = createCipheriv(ALGO, this.key, iv);
     const enc = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
     const tag = cipher.getAuthTag();
-    return Buffer.concat([iv, tag, enc]);
+    return Buffer.concat([iv, tag, enc]).toString("base64");
   }
-  decrypt(buf) {
+  decrypt(encoded) {
+    const buf = Buffer.from(encoded, "base64");
     const iv = buf.subarray(0, 12);
     const tag = buf.subarray(12, 28);
     const data = buf.subarray(28);
     const decipher = createDecipheriv(ALGO, this.key, iv);
     decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(data), decipher.final()]).toString(
-      "utf8"
-    );
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
   }
   enqueue(events) {
-    const stmt = this.db.prepare(
-      "INSERT INTO pending (payload, created_at) VALUES (?, ?)"
-    );
-    const blob = this.encrypt(JSON.stringify(events));
-    stmt.run(blob, (/* @__PURE__ */ new Date()).toISOString());
+    this.rows.push({
+      id: this.nextId++,
+      payload: this.encrypt(JSON.stringify(events)),
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    this.save();
   }
   peekBatch(limit = 100) {
-    const rows = this.db.prepare(
-      "SELECT id, payload FROM pending ORDER BY id ASC LIMIT ?"
-    ).all(limit);
+    const slice = this.rows.slice(0, limit);
     const events = [];
     const rowIds = [];
-    const del = this.db.prepare("DELETE FROM pending WHERE id = ?");
-    for (const row of rows) {
+    const drop = /* @__PURE__ */ new Set();
+    for (const row of slice) {
       try {
         const parsed = JSON.parse(this.decrypt(row.payload));
         events.push(...parsed);
         rowIds.push(row.id);
       } catch {
-        del.run(row.id);
+        drop.add(row.id);
       }
+    }
+    if (drop.size) {
+      this.rows = this.rows.filter((row) => !drop.has(row.id));
+      this.save();
     }
     return { rowIds, events };
   }
   acknowledge(rowIds) {
     if (rowIds.length === 0) return;
-    const del = this.db.prepare("DELETE FROM pending WHERE id = ?");
-    const remove = this.db.transaction((ids) => {
-      for (const id of ids) del.run(id);
-    });
-    remove(rowIds);
+    const gone = new Set(rowIds);
+    this.rows = this.rows.filter((row) => !gone.has(row.id));
+    this.save();
   }
-  /** Compatibility helper. Prefer peekBatch + acknowledge for uploads. */
   dequeueBatch(limit = 100) {
     const batch = this.peekBatch(limit);
     this.acknowledge(batch.rowIds);
     return batch.events;
   }
   depth() {
-    const row = this.db.prepare("SELECT COUNT(*) as c FROM pending").get();
-    return row.c;
+    return this.rows.length;
   }
   clear() {
-    this.db.exec("DELETE FROM pending");
+    this.rows = [];
+    this.save();
   }
 };
 
@@ -43226,8 +43237,8 @@ var wNAF = (n) => {
 
 // apps/connector/src/signing.ts
 import { createHash, randomBytes as randomBytes3 } from "node:crypto";
-import { readFileSync as readFileSync3, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, existsSync as existsSync3 } from "node:fs";
-import { dirname as dirname2, join as join3 } from "node:path";
+import { readFileSync as readFileSync4, writeFileSync as writeFileSync3, mkdirSync as mkdirSync3, existsSync as existsSync4 } from "node:fs";
+import { dirname as dirname3, join as join3 } from "node:path";
 etc.sha512Sync = (...messages) => {
   const h2 = createHash("sha512");
   for (const msg of messages) h2.update(msg);
@@ -43236,13 +43247,13 @@ etc.sha512Sync = (...messages) => {
 var KEY_FILE = join3(process.env.HOME ?? ".", ".techlio-connector", "signing.key");
 function loadOrCreateSigningKey(hexFromEnv) {
   if (hexFromEnv) return Uint8Array.from(Buffer.from(hexFromEnv, "hex"));
-  if (existsSync3(KEY_FILE)) {
-    return Uint8Array.from(readFileSync3(KEY_FILE));
+  if (existsSync4(KEY_FILE)) {
+    return Uint8Array.from(readFileSync4(KEY_FILE));
   }
-  const dir = dirname2(KEY_FILE);
-  mkdirSync2(dir, { recursive: true });
+  const dir = dirname3(KEY_FILE);
+  mkdirSync3(dir, { recursive: true });
   const priv = utils.randomPrivateKey();
-  writeFileSync2(KEY_FILE, Buffer.from(priv));
+  writeFileSync3(KEY_FILE, Buffer.from(priv));
   return priv;
 }
 async function signBody(privateKey, body) {
@@ -43309,7 +43320,7 @@ function defaultStatus(eventType) {
   return void 0;
 }
 var signingKey = loadOrCreateSigningKey(config.signingKeyHex);
-mkdirSync3(dirname3(config.dbPath), { recursive: true });
+mkdirSync4(dirname4(config.dbPath), { recursive: true });
 var queue = new EncryptedQueue(config.dbPath, "techlio-local-queue");
 function apiBase() {
   return identity?.apiBaseUrl ?? config.apiBaseUrl;

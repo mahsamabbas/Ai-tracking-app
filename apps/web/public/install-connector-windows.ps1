@@ -7,11 +7,16 @@ $InstallDir = if ($env:TECHLIO_INSTALL_DIR) { $env:TECHLIO_INSTALL_DIR } else { 
 $BundleUrl = "$TechlioSite/downloads/techlio-connector.zip"
 
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-  Write-Error "Install Node.js 20+ from https://nodejs.org then run this script again."
+  Write-Error "Install Node.js 20 or newer from https://nodejs.org then run this script again."
 }
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-  Write-Error "npm is required (comes with Node.js)."
-}
+
+$TaskName = "TechlioConnector"
+try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue } catch {}
+try { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue } catch {}
+
+Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -like "*techlio*" } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
 Write-Host "Installing Techlio connector to $InstallDir"
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
@@ -42,15 +47,13 @@ if ($EnvBackup -and (Test-Path $EnvBackup)) {
   Copy-Item (Join-Path $InstallDir ".env.example") $EnvFile
 }
 
-Write-Host "Installing dependencies (one-time)…"
-Set-Location $InstallDir
-npm install --omit=dev
-
 $Runner = Join-Path $InstallDir "run.ps1"
+if (-not (Test-Path $Runner)) {
+  Write-Error "Download did not include run.ps1. Redeploy the dashboard, then download the installer again."
+}
 $LogDir = Join-Path $env:USERPROFILE ".techlio-connector"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-$TaskName = "TechlioConnector"
 $PsArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Runner`""
 
 $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $PsArgs -WorkingDirectory $InstallDir
@@ -63,12 +66,21 @@ $Settings = New-ScheduledTaskSettingsSet `
   -RestartInterval (New-TimeSpan -Minutes 1) `
   -ExecutionTimeLimit ([TimeSpan]::Zero)
 
-try {
-  Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-} catch {}
-
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -RunLevel Limited | Out-Null
 Start-ScheduledTask -TaskName $TaskName
+
+$healthy = $false
+for ($i = 0; $i -lt 12; $i++) {
+  try {
+    $r = Invoke-WebRequest -Uri "http://127.0.0.1:9477/health" -UseBasicParsing -TimeoutSec 2
+    if ($r.StatusCode -eq 200) { $healthy = $true; break }
+  } catch {}
+  Start-Sleep -Milliseconds 500
+}
+if (-not $healthy) {
+  $errLog = Join-Path $LogDir "connector.err.log"
+  Write-Error "The connector did not start. Check $errLog"
+}
 
 Write-Host ""
 Write-Host "Done. Connector runs at http://127.0.0.1:9477"
