@@ -11,10 +11,18 @@ import pg from "pg";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sqlDir = join(root, "infra", "sql");
 
-const pool = new pg.Pool({
-  connectionString:
+function resolveMigrateUrl() {
+  return (
+    process.env.DATABASE_URL_UNPOOLED ??
+    process.env.POSTGRES_URL_NON_POOLING ??
     process.env.DATABASE_URL ??
-    "postgres://techlio:techlio@localhost:5432/techlio_activity",
+    process.env.POSTGRES_URL ??
+    "postgres://techlio:techlio@localhost:5432/techlio_activity"
+  );
+}
+
+const pool = new pg.Pool({
+  connectionString: resolveMigrateUrl(),
 });
 
 async function main() {
