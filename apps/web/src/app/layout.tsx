@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ConnectorRequiredGate } from "@/components/domain/ConnectorRequiredGate";
+import { ConnectorRuntimeGuard } from "@/components/domain/ConnectorRuntimeGuard";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme";
 
@@ -35,7 +37,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body suppressHydrationWarning>
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <ConnectorRequiredGate>{children}</ConnectorRequiredGate>
+            <ConnectorRuntimeGuard />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

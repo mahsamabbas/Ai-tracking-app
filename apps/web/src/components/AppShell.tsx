@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useConnectorSetupPhase } from "@/lib/connector-local";
+import { developerNeedsLocalConnector } from "@/lib/connector-setup";
 import { useAuth } from "@/lib/auth-context";
 import { ROLE_LABEL, ROLE_SCOPE } from "@/lib/permissions";
 import { initialsOf } from "@/lib/format";
@@ -54,6 +56,12 @@ const NAV: NavItem[] = [
     icon: icon("M7 3v4M13 3v4M5.5 7h9v4a4.5 4.5 0 0 1-9 0V7ZM10 15.5V18"),
   },
   {
+    href: "/setup-connector",
+    label: "Install agent",
+    roles: ["developer"],
+    icon: icon("M10 3 4 6v8l6 3 6-3V6l-6-3Zm0 2.2 4 2v4.6l-4 2-4-2V7.2l4-2Z"),
+  },
+  {
     href: "/connectors",
     label: "Connectors",
     roles: ["administrator", "manager", "auditor"],
@@ -101,17 +109,28 @@ export function AppShell({
 }) {
   const path = usePathname();
   const { user, logout, ready } = useAuth();
+  const { phase: connectorPhase } = useConnectorSetupPhase(4_000);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const nav = useMemo(
-    () =>
-      NAV.filter((item) => !user || item.roles.includes(user.role)).map((item) =>
+  const onboardingLocked = Boolean(
+    user &&
+      developerNeedsLocalConnector(user.role, user.developerId) &&
+      connectorPhase !== "ready",
+  );
+
+  const nav = useMemo(() => {
+    let items = NAV.filter((item) => !user || item.roles.includes(user.role)).map(
+      (item) =>
         item.href === "/employees/self" && user?.developerId
           ? { ...item, href: `/employees/${user.developerId}` }
           : item,
-      ),
-    [user],
-  );
+    );
+    if (onboardingLocked) {
+      const allowed = new Set(["/setup-connector", "/my-connectors", "/policy"]);
+      items = items.filter((item) => allowed.has(item.href));
+    }
+    return items;
+  }, [user, onboardingLocked]);
 
   useEffect(() => setMenuOpen(false), [path]);
 

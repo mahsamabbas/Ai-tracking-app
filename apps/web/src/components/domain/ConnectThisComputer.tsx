@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { CONNECTOR_LOCAL } from "@/lib/connector-local";
 import { Callout } from "@/components/ui/Callout";
 
-export const CONNECTOR_LOCAL = "http://127.0.0.1:9477";
+export { CONNECTOR_LOCAL };
 
 export async function claimLocalConnector(input: {
   accessToken: string;
@@ -40,7 +41,7 @@ export async function claimLocalConnector(input: {
       ok: false,
       offline: true,
       message:
-        "This page could not reach the connector at 127.0.0.1:9477. Keep pnpm dev running on this computer, then try again.",
+        "This page could not reach the connector at 127.0.0.1:9477. Use the install bar at the bottom of the dashboard (macOS) or run pnpm dev:connector, then try again.",
     };
   }
 }
@@ -97,7 +98,9 @@ export function ThisComputerStatus() {
   if (state.kind === "offline") {
     return (
       <Callout tone="warn" title="Connector not running on this computer">
-        Start it on this computer with pnpm dev, then activate the admin-issued key.
+        Install the background connector from the bar at the bottom of the page, or run{" "}
+        <code className="text-xs">pnpm dev:connector</code> from the repo, then activate your
+        key.
       </Callout>
     );
   }

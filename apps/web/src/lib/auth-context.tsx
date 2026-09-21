@@ -96,7 +96,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         /* private mode */
       }
       setLocked(false);
-      router.push(json.homePath ?? homePathForRole(json.user.role, json.user.developerId));
+      const role = json.user.role as PortalUser["role"];
+      const devId = json.user.developerId as string | null | undefined;
+      const destination =
+        role === "developer" && devId
+          ? "/setup-connector"
+          : (json.homePath ?? homePathForRole(role, devId));
+      router.push(destination);
     },
     [router],
   );
@@ -118,7 +124,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(stored);
     setUser(nextUser);
     setLocked(false);
-    router.push(homePathForRole(nextUser.role, nextUser.developerId));
+    router.push(
+      nextUser.role === "developer" && nextUser.developerId
+        ? "/setup-connector"
+        : homePathForRole(nextUser.role, nextUser.developerId),
+    );
   }, [router]);
 
   useEffect(() => {
@@ -158,7 +168,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isPublic = PUBLIC_PATHS.includes(pathname);
     if ((!token || locked) && !isPublic) router.replace("/login");
     if (token && !locked && isPublic) {
-      router.replace(homePathForRole(user?.role, user?.developerId));
+      const dest =
+        user?.role === "developer" && user.developerId
+          ? "/setup-connector"
+          : homePathForRole(user?.role, user?.developerId);
+      router.replace(dest);
     }
   }, [ready, token, locked, pathname, router, user?.role, user?.developerId]);
 

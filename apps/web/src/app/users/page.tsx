@@ -211,9 +211,12 @@ export default function UsersPage() {
                 </div>
               </dl>
               <p className="hint mt-4">
-                Give these to {issued.displayName}. They sign in → My connectors → paste Device ID
-                and token → Activate on this computer. Issue another key if they need a second
-                tool or machine.
+                Send {issued.displayName} the dashboard link and{" "}
+                <Link href="/setup-connector" className="font-medium text-brand-600 underline">
+                  Install agent
+                </Link>{" "}
+                guide. They install the local agent once, then My connectors → paste Device ID and
+                token → Activate. Issue another key for a second tool or machine.
               </p>
             </CardBody>
           </Card>

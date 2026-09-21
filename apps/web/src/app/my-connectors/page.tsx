@@ -8,6 +8,7 @@ import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
 import { ActivateConnectorForm } from "@/components/domain/AddConnectorForm";
+import { ConnectorInstallGuide } from "@/components/domain/ConnectorInstallGuide";
 import { ThisComputerStatus } from "@/components/domain/ConnectThisComputer";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
@@ -67,7 +68,7 @@ export default function MyConnectorsPage() {
   return (
     <AppShell
       title="My connectors"
-      subtitle="Activate the connector key your administrator assigned. You cannot add tools they did not issue."
+      subtitle="Activating your key here is required — the rest of the dashboard stays locked until pairing succeeds."
     >
       {notice ? (
         <div className="mb-5">
@@ -75,8 +76,9 @@ export default function MyConnectorsPage() {
         </div>
       ) : null}
 
-      <div className="mb-5">
+      <div className="mb-5 space-y-4">
         <ThisComputerStatus />
+        <ConnectorInstallGuide />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
