@@ -36,8 +36,9 @@ export default function SetupConnectorPage() {
         <OnboardingStepper />
         <Callout tone="warn" title="Local agent is mandatory">
           Techlio only works when a small program on <strong>this</strong> Mac or PC collects AI
-          tool activity and uploads it with your assigned key. Follow the steps below — use{" "}
-          <strong>Show guided tour</strong> for arrow pointers on each step.
+          tool activity and uploads it with your assigned key. Use the{" "}
+          <strong>Install agent</strong> item in the sidebar anytime; optional{" "}
+          <strong>Show guided tour</strong> below for step-by-step pointers.
         </Callout>
         <ThisComputerStatus />
         <ConnectorInstallGuide />

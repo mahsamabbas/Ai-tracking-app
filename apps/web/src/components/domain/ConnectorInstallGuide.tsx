@@ -27,8 +27,8 @@ function StepBadge({ done, n }: { done: boolean; n: number }) {
   );
 }
 
-export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }) {
-  const { online, refresh } = useConnectorOnline(compact ? 12_000 : 5_000);
+export function ConnectorInstallGuide() {
+  const { online, refresh } = useConnectorOnline(5_000);
   const { phase } = useConnectorSetupPhase(4_000);
   const platform = detectConnectorPlatform();
   const [copied, setCopied] = useState(false);
@@ -47,8 +47,6 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
 
   const step1Done = phase === "unpaired" || phase === "ready";
   const step3Done = phase === "ready";
-
-  if (compact && step3Done) return null;
 
   const steps = (
     <ol className="space-y-4">
@@ -117,14 +115,12 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
               Local agent is running.
             </p>
           ) : null}
-          {!compact ? (
-            <div>
-              <p className="mt-3 text-2xs font-semibold uppercase tracking-wide text-ink-500">
-                Install command
-              </p>
-              <pre className="code-snippet">{installCmd}</pre>
-            </div>
-          ) : null}
+          <div>
+            <p className="mt-3 text-2xs font-semibold uppercase tracking-wide text-ink-500">
+              Install command
+            </p>
+            <pre className="code-snippet">{installCmd}</pre>
+          </div>
         </div>
       </li>
 
@@ -169,46 +165,6 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
       </li>
     </ol>
   );
-
-  if (compact) {
-    return (
-      <div className="text-sm text-amber-950 dark:text-amber-50">
-        <p className="font-semibold">Set up tracking on this computer</p>
-        <p className="mt-1 text-xs text-amber-900 dark:text-amber-100">
-          One-time local install, then activate your admin-issued key.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Link
-            href="/setup-connector"
-            className="inline-flex h-8 items-center rounded-lg bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700"
-          >
-            Open setup guide
-          </Link>
-          {platform === "mac" || platform === "windows" ? (
-            <a
-              href={
-                platform === "windows"
-                  ? CONNECTOR_INSTALL_SCRIPT_WINDOWS
-                  : CONNECTOR_INSTALL_SCRIPT_PATH
-              }
-              download
-              className="inline-flex h-8 items-center rounded-lg border border-amber-800/35 bg-white/90 px-3 text-xs font-medium text-amber-950 hover:bg-white dark:border-amber-200/25 dark:bg-amber-900/60 dark:text-amber-50"
-            >
-              Download installer
-            </a>
-          ) : null}
-          <button
-            type="button"
-            className="inline-flex h-8 items-center rounded-lg border border-amber-800/35 bg-white/90 px-3 text-xs font-medium text-amber-950 dark:border-amber-200/25 dark:bg-amber-900/60 dark:text-amber-50"
-            onClick={() => void copyCommand()}
-          >
-            {copied ? "Copied" : "Copy command"}
-          </button>
-        </div>
-        <pre className="code-snippet mt-2 max-h-28 text-[10px]">{installCmd}</pre>
-      </div>
-    );
-  }
 
   return (
     <Card>

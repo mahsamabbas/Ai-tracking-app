@@ -50,16 +50,16 @@ const NAV: NavItem[] = [
     match: (p) => p.startsWith("/employees") || p.startsWith("/sessions"),
   },
   {
-    href: "/my-connectors",
-    label: "My connectors",
-    roles: ["developer"],
-    icon: icon("M7 3v4M13 3v4M5.5 7h9v4a4.5 4.5 0 0 1-9 0V7ZM10 15.5V18"),
-  },
-  {
     href: "/setup-connector",
     label: "Install agent",
     roles: ["developer"],
     icon: icon("M10 3 4 6v8l6 3 6-3V6l-6-3Zm0 2.2 4 2v4.6l-4 2-4-2V7.2l4-2Z"),
+  },
+  {
+    href: "/my-connectors",
+    label: "My connectors",
+    roles: ["developer"],
+    icon: icon("M7 3v4M13 3v4M5.5 7h9v4a4.5 4.5 0 0 1-9 0V7ZM10 15.5V18"),
   },
   {
     href: "/connectors",
@@ -171,21 +171,30 @@ export function AppShell({
               key={item.href}
               href={item.href}
               data-onboarding={
-                item.href === "/my-connectors" ? "onboard-nav-connectors" : undefined
+                item.href === "/my-connectors"
+                  ? "onboard-nav-connectors"
+                  : item.href === "/setup-connector"
+                    ? "onboard-nav-install"
+                    : undefined
               }
               aria-current={active ? "page" : undefined}
               className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                onboardingLocked && item.href === "/my-connectors"
-                  ? "ring-2 ring-brand-400 ring-offset-2 ring-offset-card dark:ring-offset-card"
+                onboardingLocked && item.href === "/setup-connector" && !active
+                  ? "bg-amber-50 text-amber-900 ring-1 ring-amber-300 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-700"
                   : ""
               } ${
                 active
-                  ? "bg-brand-50 text-brand-700"
+                  ? "bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-200"
                   : "text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/5"
               }`}
             >
               <span className={active ? "text-brand-600" : "text-ink-400"}>{item.icon}</span>
-              {item.label}
+              <span className="min-w-0 flex-1">{item.label}</span>
+              {onboardingLocked && item.href === "/setup-connector" ? (
+                <span className="shrink-0 rounded bg-amber-200/80 px-1.5 py-0.5 text-2xs font-semibold text-amber-950 dark:bg-amber-800 dark:text-amber-50">
+                  Start here
+                </span>
+              ) : null}
             </Link>
           );
         })}

@@ -9,7 +9,6 @@ import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
 import { ActivateConnectorForm } from "@/components/domain/AddConnectorForm";
 import { OnboardingStepper } from "@/components/onboarding/OnboardingStepper";
-import { ConnectorInstallGuide } from "@/components/domain/ConnectorInstallGuide";
 import { ThisComputerStatus } from "@/components/domain/ConnectThisComputer";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
@@ -80,7 +79,6 @@ export default function MyConnectorsPage() {
       <div className="mb-5 space-y-4">
         <OnboardingStepper />
         <ThisComputerStatus />
-        <ConnectorInstallGuide />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">

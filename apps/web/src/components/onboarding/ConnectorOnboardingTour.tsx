@@ -61,7 +61,7 @@ export function ConnectorOnboardingTour() {
   const pathname = usePathname();
   const { phase } = useConnectorSetupPhase(4_000);
   const [stepIndex, setStepIndex] = useState(0);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(true);
 
   const show = Boolean(
     ready &&
