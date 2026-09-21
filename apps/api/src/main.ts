@@ -11,7 +11,7 @@ import { seedPortalUsers, startDemoConnectorKeepalive } from "@techlio/server-co
 async function bootstrap() {
   initRecalcQueue();
   await seedPortalUsers();
-  startDemoConnectorKeepalive();
+  startDemoConnectorKeepalive(); // live-only unless DEMO_CONNECTOR_KEEPALIVE=1
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),

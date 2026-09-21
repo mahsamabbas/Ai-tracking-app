@@ -57,9 +57,9 @@ interface Persona {
 const PERSONAS: Persona[] = [
   {
     name: "Alex Rivera", email: "developer@techlio.local", team: "Platform",
-    title: "Senior Engineer", intensity: 4.2, startHour: 9,
-    providers: [{ provider: "cursor", weight: 3 }, { provider: "claude_code", weight: 4 }],
-    status: "active", connector: "online",
+    title: "Senior Engineer", intensity: 0, startHour: 9,
+    providers: [{ provider: "cursor", weight: 1 }],
+    status: "active", connector: "offline",
   },
   {
     name: "Sam Okafor", email: "sam@techlio.local", team: "Platform",
@@ -308,6 +308,7 @@ export async function seedDemoOrganization(options?: {
   };
 
   for (const emp of employees) {
+    if (emp.email === "developer@techlio.local") continue;
     if (emp.intensity === 0) continue;
     const weightTotal = emp.providers.reduce((s, p) => s + p.weight, 0);
 

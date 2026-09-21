@@ -57,13 +57,9 @@ companion. It deliberately includes stale/offline/paused connectors, a person
 with no telemetry, unassigned sessions, mid-session coverage gaps, failed tests
 and builds, and weekend/idle patterns.
 
-Seeded heartbeats are static, so the API re-anchors **only seeded** connector
-heartbeats once a minute (`demo-keepalive.ts`, `connector_health.demo_state`).
-Disabled with `DEMO_CONNECTOR_KEEPALIVE=0` or in production.
-
-Alex (the local `pnpm dev` connector identity) is excluded: demo Claude/Cursor
-rows are frozen unless a real heartbeat arrives. "Online" on Alex means the
-local connector actually reported in — it is not a process-less sample flag.
+Disabled unless `DEMO_CONNECTOR_KEEPALIVE=1`. Local `pnpm dev` does not
+fake connector online states. Alex is the live machine identity: only a
+Cursor device slot is seeded, with no generated sessions.
 
 ## Local run
 

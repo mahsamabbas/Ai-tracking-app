@@ -106,10 +106,10 @@ cases the product must handle — stale and offline connectors, a paused one, a
 person with no telemetry at all, unassigned sessions, coverage gaps mid-session,
 failed tests and builds, weekend and idle patterns.
 
-Because seeded heartbeats are static, the API re-anchors *only* the seeded
-connector heartbeats once a minute so the intended online/stale/paused/offline
-mix stays visible. It touches nothing else, and is disabled with
-`DEMO_CONNECTOR_KEEPALIVE=0` or in production.
+Because seeded heartbeats are static, fake connector online states are **off**
+during local `pnpm dev`. Set `DEMO_CONNECTOR_KEEPALIVE=1` only if you need the
+sample org to look live. The developer login (Alex) is never seeded with fake
+sessions — that identity is the machine running the local connector.
 
 ## Privacy posture
 

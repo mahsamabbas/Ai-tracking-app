@@ -12,13 +12,11 @@ import { DEV_DEVELOPER_ALEX } from "./users.js";
  *
  * It never fakes a tool on the local live identity (Alex): those rows stay
  * offline unless a real connector heartbeats. Off in production, and off
- * entirely with DEMO_CONNECTOR_KEEPALIVE=0.
+ * Off unless DEMO_CONNECTOR_KEEPALIVE=1. Local `pnpm dev` is live tracking
+ * for this machine — it does not fake other tools or employees as online.
  */
 export function startDemoConnectorKeepalive(): (() => void) | null {
-  const enabled =
-    process.env.DEMO_CONNECTOR_KEEPALIVE === "1" ||
-    (process.env.DEMO_CONNECTOR_KEEPALIVE !== "0" &&
-      process.env.NODE_ENV !== "production");
+  const enabled = process.env.DEMO_CONNECTOR_KEEPALIVE === "1";
 
   const freezeLiveIdentitySamples = async () => {
     await db.execute(sql`
