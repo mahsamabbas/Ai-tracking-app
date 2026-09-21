@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Optional local env for API URL / port — identity is claimed, not stored here. */
 function loadLocalEnv(): void {
   const candidates = [
+    join(homedir(), ".techlio", "connector", ".env"),
     join(dirname(fileURLToPath(import.meta.url)), "../.env"),
     join(process.cwd(), ".env"),
     join(process.cwd(), "apps/connector/.env"),

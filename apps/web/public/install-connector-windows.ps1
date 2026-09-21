@@ -15,6 +15,12 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
 
 Write-Host "Installing Techlio connector to $InstallDir"
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+$EnvBackup = $null
+$ExistingEnv = Join-Path $InstallDir ".env"
+if (Test-Path $ExistingEnv) {
+  $EnvBackup = Join-Path $env:TEMP "techlio-connector.env.bak"
+  Copy-Item $ExistingEnv $EnvBackup -Force
+}
 $TmpZip = Join-Path $env:TEMP "techlio-connector.zip"
 Invoke-WebRequest -Uri $BundleUrl -OutFile $TmpZip -UseBasicParsing
 if (Test-Path $InstallDir) {
@@ -29,7 +35,10 @@ if (Test-Path $Nested) {
 }
 
 $EnvFile = Join-Path $InstallDir ".env"
-if (-not (Test-Path $EnvFile)) {
+if ($EnvBackup -and (Test-Path $EnvBackup)) {
+  Copy-Item $EnvBackup $EnvFile -Force
+  Remove-Item $EnvBackup -Force
+} elseif (-not (Test-Path $EnvFile)) {
   Copy-Item (Join-Path $InstallDir ".env.example") $EnvFile
 }
 

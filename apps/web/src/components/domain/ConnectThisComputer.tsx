@@ -41,7 +41,7 @@ export async function claimLocalConnector(input: {
       ok: false,
       offline: true,
       message:
-        "This page could not reach the connector at 127.0.0.1:9477. Use the install bar at the bottom of the dashboard (macOS) or run pnpm dev:connector, then try again.",
+        "This page could not reach the connector at 127.0.0.1:9477. Install the local agent from this site (Node.js only), then try again.",
     };
   }
 }
@@ -98,9 +98,8 @@ export function ThisComputerStatus() {
   if (state.kind === "offline") {
     return (
       <Callout tone="warn" title="Connector not running on this computer">
-        Install the background connector from the bar at the bottom of the page, or run{" "}
-        <code className="code-inline">pnpm dev:connector</code> from the repo, then activate your
-        key.
+        Install the local agent from this page (Node.js only — no project download), then activate
+        your key.
       </Callout>
     );
   }

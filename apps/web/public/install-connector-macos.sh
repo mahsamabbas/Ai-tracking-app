@@ -17,6 +17,11 @@ command -v npm >/dev/null 2>&1 || {
 
 echo "Installing Techlio connector to $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
+ENV_BACKUP=""
+if [[ -f "$INSTALL_DIR/.env" ]]; then
+  ENV_BACKUP="$(mktemp)"
+  cp "$INSTALL_DIR/.env" "$ENV_BACKUP"
+fi
 TMPZIP="$(mktemp -t techlio-connector).zip"
 curl -fsSL "$BUNDLE_URL" -o "$TMPZIP"
 rm -rf "$INSTALL_DIR"/*
@@ -28,7 +33,10 @@ if [[ -d "$INSTALL_DIR/techlio-connector" ]]; then
 fi
 rm -f "$TMPZIP"
 
-if [[ ! -f "$INSTALL_DIR/.env" ]]; then
+if [[ -n "$ENV_BACKUP" ]]; then
+  cp "$ENV_BACKUP" "$INSTALL_DIR/.env"
+  rm -f "$ENV_BACKUP"
+elif [[ ! -f "$INSTALL_DIR/.env" ]]; then
   cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
 fi
 
