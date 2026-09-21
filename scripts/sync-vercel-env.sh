@@ -28,6 +28,7 @@ vercel env rm NEXT_PUBLIC_API_URL production --yes 2>/dev/null || true
 printf '%s\n' "$API_URL" | vercel env add NEXT_PUBLIC_API_URL production
 vercel env pull "$ROOT/apps/web/.env.local" --environment=production --yes
 
-echo "Done. Redeploy tracking-app-api and tracking-app-api-t9yd on Vercel."
+echo "Done. Redeploy from repo root (not apps/web or .vercel-api):"
+echo "  $ROOT/scripts/deploy-vercel.sh all"
 echo "  API health: curl -s $API_URL/v1/health"
 echo "  Dashboard:  $DASHBOARD_URL/login"

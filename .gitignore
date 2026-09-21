@@ -8,3 +8,5 @@ dist
 .env.production.api
 *.db
 *.tsbuildinfo
+.vercel
+.env*
