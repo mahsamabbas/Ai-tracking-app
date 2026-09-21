@@ -33,6 +33,7 @@ import {
   resolveRange,
   toolCategoryBreakdown,
   toolDistribution,
+  workItems,
   weekdayPattern,
   type AuthUser,
   type DateRange,
@@ -95,16 +96,22 @@ export class AnalyticsController {
   @Get("meta/filters")
   async filters(@Req() req: FastifyRequest) {
     const user = userFromRequest(req);
-    const [teams, projectRows] = await Promise.all([
+    const [teams, projectRows, workItemRows] = await Promise.all([
       listTeams(user.organizationId),
       db
         .select({ id: projects.id, name: projects.name })
         .from(projects)
         .where(eq(projects.organizationId, user.organizationId)),
+      db
+        .select({ id: workItems.id, title: workItems.title, projectId: workItems.projectId })
+        .from(workItems)
+        .where(eq(workItems.organizationId, user.organizationId)),
     ]);
     return {
       teams,
       projects: projectRows,
+      workItems: workItemRows,
+      timezone: process.env.ORG_TIMEZONE ?? "UTC",
       providers: Object.values(PROVIDER_CAPABILITIES).map((p) => ({
         id: p.id,
         label: p.label,
@@ -318,6 +325,9 @@ export class AnalyticsController {
       provider?: string;
       classification?: string;
       projectId?: string;
+      workItemId?: string;
+      coverageState?: string;
+      clockHour?: string;
       page?: string;
       pageSize?: string;
     },
@@ -338,6 +348,12 @@ export class AnalyticsController {
         provider: q.provider || undefined,
         classification: q.classification || undefined,
         projectId: q.projectId || undefined,
+        workItemId: q.workItemId || undefined,
+        coverageState: q.coverageState || undefined,
+        clockHour:
+          q.clockHour != null && q.clockHour !== ""
+            ? Number(q.clockHour)
+            : undefined,
         from: range.from,
         to: range.to,
         limit: pageSize,

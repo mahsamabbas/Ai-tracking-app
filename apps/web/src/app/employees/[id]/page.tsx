@@ -13,6 +13,7 @@ import {
   EmptyState,
   emptyActivityVariant,
   ErrorState,
+  LoadingBlock,
   NotFoundState,
   StatSkeleton,
 } from "@/components/ui/States";
@@ -51,6 +52,17 @@ export default function EmployeeDetailPage() {
     `/v1/employees/${id}${qs(rangeParams(range))}`,
   );
   const live = useApi<LiveStatus>("/v1/dashboard/live?limit=20", { pollMs: 45_000 });
+  const timeline = useApi<{
+    timezone: string;
+    hourlyCards: {
+      id: string;
+      hourStart: string;
+      hourLabel: string;
+      version: number;
+      completeness: string;
+      metrics: { eventCount?: number; mergedActiveDurationMs?: number; fileChanges?: number };
+    }[];
+  }>(`/v1/developers/${id}/timeline?hours=48`);
 
   const d = query.data;
   const t = d?.totals;
@@ -462,6 +474,61 @@ export default function EmployeeDetailPage() {
                 hrefLabel={`All ${d.totalSessions} sessions`}
               />
               <SessionTable sessions={d.recentSessions} projectNames={projectNames} />
+            </Card>
+          </section>
+
+          <section className="mt-5">
+            <Card>
+              <CardHeader
+                title="Hourly timeline"
+                subtitle={
+                  timeline.data?.timezone
+                    ? `Latest version of each hour · ${timeline.data.timezone}`
+                    : "One card per clock hour, linked to its source events"
+                }
+              />
+              {timeline.error ? (
+                <ErrorState
+                  title="Could not load hourly cards"
+                  detail={timeline.error}
+                  onRetry={timeline.reload}
+                />
+              ) : timeline.loading ? (
+                <LoadingBlock rows={4} />
+              ) : (timeline.data?.hourlyCards.length ?? 0) === 0 ? (
+                <EmptyState
+                  compact
+                  title="No hourly summaries yet"
+                  body="Hourly cards appear after the worker finalises a completed hour. The current hour stays open until it closes."
+                />
+              ) : (
+                <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {timeline.data!.hourlyCards.slice(0, 12).map((card) => (
+                    <Link
+                      key={card.id}
+                      href={`/hourly/${card.id}`}
+                      className="rounded-xl border border-line bg-card p-3 transition hover:border-brand-300"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-ink-900">{card.hourLabel}</p>
+                        <span
+                          className={
+                            card.completeness === "complete" ? "badge-ok" : "badge-warn"
+                          }
+                        >
+                          {card.completeness}
+                        </span>
+                      </div>
+                      <p className="hint mt-2">
+                        {formatDuration(card.metrics.mergedActiveDurationMs ?? 0)} active ·{" "}
+                        {card.metrics.eventCount ?? 0} events · {card.metrics.fileChanges ?? 0} file
+                        changes
+                      </p>
+                      <p className="hint">v{card.version}</p>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </Card>
           </section>
 

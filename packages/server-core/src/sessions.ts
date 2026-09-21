@@ -252,7 +252,11 @@ export interface SessionListFilters {
   developerIds?: string[];
   provider?: string;
   projectId?: string;
+  workItemId?: string;
   classification?: string;
+  coverageState?: string;
+  /** 0–23 in the organization timezone. */
+  clockHour?: number;
   from?: Date;
   to?: Date;
   limit?: number;
@@ -267,8 +271,17 @@ function sessionConditions(f: SessionListFilters) {
   }
   if (f.provider) conds.push(eq(agentSessions.provider, f.provider));
   if (f.projectId) conds.push(eq(agentSessions.projectId, f.projectId));
+  if (f.workItemId) conds.push(eq(agentSessions.workItemId, f.workItemId));
   if (f.classification) {
     conds.push(eq(agentSessions.classification, f.classification));
+  }
+  if (f.coverageState) {
+    conds.push(eq(agentSessions.coverageState, f.coverageState));
+  }
+  if (f.clockHour != null && f.clockHour >= 0 && f.clockHour <= 23) {
+    conds.push(
+      sql`EXTRACT(HOUR FROM ${agentSessions.startedAt} AT TIME ZONE ${process.env.ORG_TIMEZONE ?? "UTC"}) = ${f.clockHour}`,
+    );
   }
   if (f.from) conds.push(gte(agentSessions.startedAt, f.from));
   if (f.to) conds.push(lte(agentSessions.startedAt, f.to));

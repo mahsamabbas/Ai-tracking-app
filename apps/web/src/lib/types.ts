@@ -111,6 +111,7 @@ export interface EmployeeRow {
   tools: { provider: string; activeMs: number; sessions: number }[];
   trend: { date: string; activeMs: number }[];
   coverageWarning: boolean;
+  currentHourEvents: number;
 }
 
 export interface EmployeeProfile {
@@ -302,5 +303,7 @@ export interface LiveStatus {
 export interface FilterMeta {
   teams: string[];
   projects: { id: string; name: string }[];
+  workItems: { id: string; title: string; projectId: string | null }[];
+  timezone?: string;
   providers: ProviderCapability[];
 }

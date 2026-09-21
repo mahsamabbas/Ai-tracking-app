@@ -51,6 +51,8 @@ export interface EmployeeDirectoryRow {
   tools: { provider: string; activeMs: number; sessions: number }[];
   trend: { date: string; activeMs: number }[];
   coverageWarning: boolean;
+  /** Events whose occurred_at falls in the current UTC hour. */
+  currentHourEvents: number;
 }
 
 export interface EmployeeDirectoryFilters {
@@ -144,7 +146,7 @@ export async function listEmployeeDirectory(
     ORDER BY e.display_name ASC
   `);
 
-  const [tools, trends] = await Promise.all([
+  const [tools, trends, hourCounts] = await Promise.all([
     db.execute<{
       developer_id: string;
       provider: string;
@@ -170,6 +172,13 @@ export async function listEmployeeDirectory(
       GROUP BY developer_id, day
       ORDER BY day ASC
     `),
+    db.execute<{ developer_id: string; n: number }>(sql`
+      SELECT developer_id, COUNT(*)::int AS n
+      FROM activity_events
+      WHERE organization_id = ${f.organizationId}
+        AND occurred_at >= date_trunc('hour', NOW())
+      GROUP BY developer_id
+    `),
   ]);
 
   const toolsBy = new Map<string, { provider: string; activeMs: number; sessions: number }[]>();
@@ -182,6 +191,9 @@ export async function listEmployeeDirectory(
     });
     toolsBy.set(t.developer_id, list);
   }
+
+  const hourBy = new Map<string, number>();
+  for (const h of hourCounts.rows) hourBy.set(h.developer_id, h.n);
 
   const trendBy = new Map<string, { date: string; activeMs: number }[]>();
   for (const t of trends.rows) {
@@ -226,6 +238,7 @@ export async function listEmployeeDirectory(
         Boolean(r.any_offline) ||
         Boolean(r.any_stale) ||
         r.paused === 1,
+      currentHourEvents: hourBy.get(r.id) ?? 0,
     };
   });
 

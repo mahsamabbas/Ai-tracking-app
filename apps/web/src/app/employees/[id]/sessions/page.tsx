@@ -39,9 +39,15 @@ function SessionsInner() {
   const [provider, setProvider] = useState(searchParams.get("provider") ?? "");
   const [classification, setClassification] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [workItemId, setWorkItemId] = useState("");
+  const [coverageState, setCoverageState] = useState("");
+  const [clockHour, setClockHour] = useState("");
   const [page, setPage] = useState(1);
 
-  useEffect(() => setPage(1), [range, provider, classification, projectId]);
+  useEffect(
+    () => setPage(1),
+    [range, provider, classification, projectId, workItemId, coverageState, clockHour],
+  );
 
   const meta = useApi<FilterMeta>("/v1/meta/filters");
   const query = useApi<{
@@ -56,6 +62,9 @@ function SessionsInner() {
       provider: provider || undefined,
       classification: classification || undefined,
       projectId: projectId || undefined,
+      workItemId: workItemId || undefined,
+      coverageState: coverageState || undefined,
+      clockHour: clockHour || undefined,
       page,
       pageSize: PAGE_SIZE,
     })}`,
@@ -86,12 +95,27 @@ function SessionsInner() {
     projectId
       ? { label: `Project: ${projectNames[projectId] ?? projectId}`, onRemove: () => setProjectId("") }
       : null,
+    workItemId
+      ? {
+          label: `Work item: ${meta.data?.workItems.find((w) => w.id === workItemId)?.title ?? workItemId}`,
+          onRemove: () => setWorkItemId(""),
+        }
+      : null,
+    coverageState
+      ? { label: `Coverage: ${coverageState}`, onRemove: () => setCoverageState("") }
+      : null,
+    clockHour !== ""
+      ? { label: `Hour: ${clockHour.padStart(2, "0")}:00`, onRemove: () => setClockHour("") }
+      : null,
   ].filter(Boolean) as { label: string; onRemove: () => void }[];
 
   const clearAll = () => {
     setProvider("");
     setClassification("");
     setProjectId("");
+    setWorkItemId("");
+    setCoverageState("");
+    setClockHour("");
   };
 
   return (
@@ -138,6 +162,39 @@ function SessionsInner() {
           allLabel="All projects"
           width="w-[190px]"
           options={(meta.data?.projects ?? []).map((p) => ({ value: p.id, label: p.name }))}
+        />
+        <SelectFilter
+          label="Work item"
+          value={workItemId}
+          onChange={setWorkItemId}
+          allLabel="All work items"
+          width="w-[190px]"
+          options={(meta.data?.workItems ?? [])
+            .filter((w) => !projectId || w.projectId === projectId)
+            .map((w) => ({ value: w.id, label: w.title }))}
+        />
+        <SelectFilter
+          label="Coverage"
+          value={coverageState}
+          onChange={setCoverageState}
+          allLabel="Any coverage"
+          width="w-[160px]"
+          options={[
+            { value: "complete", label: "Complete" },
+            { value: "partial", label: "Partial" },
+            { value: "gap", label: "Coverage gap" },
+          ]}
+        />
+        <SelectFilter
+          label="Clock hour"
+          value={clockHour}
+          onChange={setClockHour}
+          allLabel="Any hour"
+          width="w-[130px]"
+          options={Array.from({ length: 24 }, (_, hour) => ({
+            value: String(hour),
+            label: `${String(hour).padStart(2, "0")}:00`,
+          }))}
         />
       </FilterBar>
 

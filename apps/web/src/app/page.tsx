@@ -29,11 +29,11 @@ import {
 } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
-import { qs } from "@/lib/api";
+import { API_BASE, apiPost, qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import { classificationOf, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
-import { canViewTeam } from "@/lib/permissions";
+import { canExportActivity, canViewTeam } from "@/lib/permissions";
 import type {
   FilterMeta,
   LiveStatus,
@@ -41,10 +41,40 @@ import type {
 } from "@/lib/types";
 
 export default function OverviewPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [range, setRange] = useState<RangeValue>({ preset: "7d" });
   const [team, setTeam] = useState("");
   const [provider, setProvider] = useState("");
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+
+  async function downloadExport(format: "csv" | "pdf") {
+    if (!token) return;
+    setExporting(format);
+    try {
+      const created = await apiPost<{ downloadUrl: string }>("/v1/activity-exports", token, {
+        format,
+        preset: range.preset === "custom" ? undefined : range.preset,
+        from: range.preset === "custom" && range.from ? new Date(range.from).toISOString() : undefined,
+        to:
+          range.preset === "custom" && range.to
+            ? new Date(new Date(range.to).getTime() + 86_400_000).toISOString()
+            : undefined,
+      });
+      const response = await fetch(`${API_BASE}${created.downloadUrl}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Export download failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `activity-summary.${format}`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(null);
+    }
+  }
 
   const isSelfScope = user?.role === "developer";
   const params = { ...rangeParams(range), team: team || undefined, provider: provider || undefined };
@@ -109,9 +139,31 @@ export default function OverviewPage() {
       }
       actions={
         canViewTeam(user?.role) ? (
-          <Link href="/employees" className="btn-primary">
-            Employee directory
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {canExportActivity(user?.role) ? (
+              <>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={exporting !== null}
+                  onClick={() => void downloadExport("csv")}
+                >
+                  {exporting === "csv" ? "Exporting…" : "Export CSV"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={exporting !== null}
+                  onClick={() => void downloadExport("pdf")}
+                >
+                  {exporting === "pdf" ? "Exporting…" : "Export PDF"}
+                </button>
+              </>
+            ) : null}
+            <Link href="/employees" className="btn-primary">
+              Employee directory
+            </Link>
+          </div>
         ) : null
       }
     >

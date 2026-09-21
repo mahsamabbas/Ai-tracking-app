@@ -218,6 +218,7 @@ export default function EmployeesPage() {
                     <th className="text-right">Avg session</th>
                     <th>Trend</th>
                     <th>Last active</th>
+                    <th className="text-right">This hour</th>
                     <th aria-label="Open" />
                   </tr>
                 </thead>
@@ -291,6 +292,18 @@ export default function EmployeesPage() {
                         </td>
                         <td className="whitespace-nowrap text-sm text-ink-500">
                           {formatRelative(r.lastActiveAt)}
+                        </td>
+                        <td
+                          className="num text-right text-ink-700"
+                          title={
+                            r.coverageWarning && r.currentHourEvents === 0
+                              ? "No events this hour, and the connector is not fully online. This is not shown as zero activity."
+                              : "Events recorded in the current clock hour"
+                          }
+                        >
+                          {r.coverageWarning && r.currentHourEvents === 0
+                            ? "—"
+                            : r.currentHourEvents}
                         </td>
                         <td className="text-right">
                           <Link

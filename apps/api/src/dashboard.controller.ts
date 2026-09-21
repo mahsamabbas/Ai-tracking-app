@@ -18,6 +18,7 @@ import {
   getOrgPolicy,
   hourlySnapshots,
   isDatabaseReady,
+  orgTimezone,
   sql,
 } from "@techlio/server-core";
 import { and, desc, eq, gte } from "drizzle-orm";
@@ -225,6 +226,40 @@ export class DashboardController {
       });
     }
 
+    const signalRes = await db.execute<{
+      event_type: string;
+      developer_id: string;
+      display_name: string;
+      n: number;
+    }>(sql`
+      SELECT ae.event_type, ae.developer_id, e.display_name, COUNT(*)::int AS n
+      FROM activity_events ae
+      JOIN employees e ON e.id = ae.developer_id
+      WHERE ae.organization_id = ${user.organizationId}
+        AND ae.occurred_at >= NOW() - INTERVAL '24 hours'
+        AND ae.event_type IN ('upload_failed', 'upload_recovered', 'update_required')
+        ${selfOnly !== null ? sql`AND ae.developer_id = ${selfOnly}` : sql``}
+      GROUP BY ae.event_type, ae.developer_id, e.display_name
+      ORDER BY n DESC
+      LIMIT 12
+    `);
+    for (const row of signalRes.rows) {
+      if (row.event_type === "upload_failed" && row.n < 2) continue;
+      const label =
+        row.event_type === "upload_recovered"
+          ? "upload recovered"
+          : row.event_type === "update_required"
+            ? "connector update required"
+            : "repeated upload failures";
+      alerts.push({
+        severity: row.event_type === "upload_recovered" ? "info" : "warning",
+        code: row.event_type,
+        message: `${row.display_name}: ${label} (${row.n} in the last 24 hours).`,
+        developerId: row.developer_id,
+        displayName: row.display_name,
+      });
+    }
+
     return {
       dbAvailable: true,
       connectors,
@@ -262,7 +297,29 @@ export class DashboardController {
         ),
       )
       .orderBy(desc(hourlySnapshots.hourStart));
-    return { hourlyCards: snapshots };
+    const tz = orgTimezone();
+    const hourFmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: tz,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    const latest = new Map<string, (typeof snapshots)[number]>();
+    for (const snap of snapshots) {
+      const key = new Date(snap.hourStart).toISOString();
+      const prev = latest.get(key);
+      if (!prev || snap.version > prev.version) latest.set(key, snap);
+    }
+    const hourlyCards = [...latest.values()]
+      .sort((a, b) => new Date(b.hourStart).getTime() - new Date(a.hourStart).getTime())
+      .map((snap) => ({
+        ...snap,
+        hourLabel: hourFmt.format(new Date(snap.hourStart)),
+      }));
+    return { timezone: tz, hourlyCards };
   }
 
   /** FR-025 — drill from an hourly summary to its source events. */

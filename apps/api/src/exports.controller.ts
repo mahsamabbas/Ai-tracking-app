@@ -27,6 +27,7 @@ export class ExportsController {
     body: {
       format?: "csv" | "pdf";
       developerId?: string;
+      preset?: string;
       from?: string;
       to?: string;
     },
@@ -40,6 +41,7 @@ export class ExportsController {
       requestedBy: user.id,
       format: body.format ?? "csv",
       developerId: body.developerId,
+      preset: body.preset,
       from: body.from ? new Date(body.from) : undefined,
       to: body.to ? new Date(body.to) : undefined,
     });
@@ -62,15 +64,17 @@ export class ExportsController {
       return;
     }
     const type =
-      file.format === "csv"
-        ? "text/csv; charset=utf-8"
-        : "text/plain; charset=utf-8";
+      file.format === "csv" ? "text/csv; charset=utf-8" : "application/pdf";
+    const body =
+      file.format === "pdf"
+        ? Buffer.from(file.content, "base64")
+        : file.content;
     reply
       .header("Content-Type", type)
       .header(
         "Content-Disposition",
-        `attachment; filename="activity-export-${id}.${file.format}"`,
+        `attachment; filename="activity-export-${id}.${file.format === "pdf" ? "pdf" : "csv"}"`,
       )
-      .send(file.content);
+      .send(body);
   }
 }

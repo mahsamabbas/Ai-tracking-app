@@ -57,9 +57,16 @@ pilot, production hardening, and the §19 live integration tests remain.
 ## Still pending
 
 - Legal/HR (SEC-007/010), pilot report, Phase 0 live validation
-- Production OIDC/SSO
-- FR-024 LLM summaries (deliberately not enabled), FR-027 email/Slack delivery
-- Full PDF export layout
-- TLS, managed encryption at rest, WCAG audit, Terraform, and executed ops drills
+- Production OIDC/SSO, TLS, encryption at rest, WCAG, Terraform, ops drills
+- FR-024 LLM summaries (deliberately not enabled)
+- FR-027 email/Slack delivery (in-app upload and update alerts are in place)
 - Live §19 integration: offline queue, long idle, late-event E2E, heartbeat stop,
   pause E2E, signature replay
+
+## 2026-09-21 product-gap pass
+
+- Directory shows the current-hour event count, blank when the connector is not
+  online and the hour has no events.
+- Employee page renders hourly cards from `/v1/developers/:id/timeline`.
+- Session history filters by work item, coverage state, and clock hour.
+- Managers can download CSV or a real PDF summary from the organisation overview.

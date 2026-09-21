@@ -29,16 +29,17 @@ Last reviewed: 2026-09-21 (delivery-phase audit and integrity pass).
   boundary; otherwise add a durable server-side ingestion queue.
 - [ ] Persist connector-reported capabilities and use them in health/coverage
   views instead of relying only on the static provider catalog (FR-012).
-- [ ] Emit and surface repeated `upload_failed` / `upload_recovered` and
-  `update_required` events and alerts.
-- [ ] Add per-developer current-hour event count/current context to the team
-  overview (FR-020).
-- [ ] Wire `/v1/developers/:id/timeline` into an employee-day hourly-card UI
-  (FR-022).
-- [ ] Add work-item, coverage-state, event-type, and clock-hour filters where
-  required (FR-026).
-- [ ] Add manager export controls and generate an actual PDF rather than the
-  current text stand-in (FR-028).
+- [x] Surface repeated `upload_failed` (two or more in 24h), `upload_recovered`,
+  and `update_required` on the live overview. Email/Slack delivery is still open.
+- [x] Add per-developer current-hour event count/current context to the team
+  overview (FR-020). Offline or paused connectors with no events stay blank
+  rather than a zero.
+- [x] Wire `/v1/developers/:id/timeline` into an employee-day hourly-card UI
+  (FR-022). Labels use `ORG_TIMEZONE`.
+- [x] Add work-item, coverage-state, and clock-hour filters on session history
+  (FR-026). Event-type filtering already exists on the session detail timeline.
+- [x] Generate a real PDF activity summary (FR-028). CSV remains the full event
+  list. The PDF is an operational count by event type, not a billing document.
 - [ ] Complete notification rules for repeated upload failure, unsupported
   versions, prolonged unassigned activity, and summary failure; add approved
   email/Slack delivery if required (FR-027).
@@ -46,7 +47,7 @@ Last reviewed: 2026-09-21 (delivery-phase audit and integrity pass).
   evidence links, model metadata, versioned corrections, and failure handling.
 - [ ] Make hourly completeness include every relevant stale/offline/upload gap
   and expose late delivery (`received_at` versus `occurred_at`) explicitly.
-- [ ] Apply configured organization timezone consistently to hourly labels.
+- [x] Apply configured organization timezone (`ORG_TIMEZONE`) to hourly-card labels.
 - [ ] Run the seven-day internal pilot and complete
   `docs/pilot-report-template.md`.
 
@@ -112,13 +113,12 @@ Last reviewed: 2026-09-21 (delivery-phase audit and integrity pass).
 | FR-006 | **Partial** — Claude hooks; Cursor companion/daily only; Codex/Gemini adapters pending |
 | FR-007 | **Done locally** — register/revoke, token hash, activation key binding, API Ed25519 verification |
 | FR-024 | **Deferred** — UI explains deterministic metrics only |
-| FR-027 | **Partial** — in-app health notifications; no email/Slack delivery |
-| FR-028 | **Partial** — CSV + text export (not full PDF layout) |
+| FR-027 | **Partial** — in-app alerts including repeated upload failure and update required; no email/Slack |
+| FR-028 | **Done locally** — CSV event list and a real PDF summary (not a billing layout) |
 
-FR-021 and the session drill-down core of FR-025 are done. FR-020/022/026 remain
-**partial**: the team view lacks a per-developer current-hour event count, the
-hourly-card day timeline API is not wired into the web UI, and work-item,
-coverage-state, and clock-hour filters are missing.
+FR-020, FR-021, FR-022, and the session filters in FR-026 are done in the local
+prototype. FR-025 session drill-down is done. Production SSO, live Claude
+validation, and the seven-day pilot remain open.
 
 FR-002/003/004/005 are implemented for the local prototype (RBAC on routes, org-scoped queries, developer self-view, pause → coverage gap).
 
