@@ -9,9 +9,11 @@ import { ExportsController } from "./exports.controller.js";
 import { StreamController } from "./stream.controller.js";
 import { AuthController } from "./auth/auth.controller.js";
 import { OrgController } from "./org.controller.js";
+import { HealthController } from "./health.controller.js";
 
 @Module({
   controllers: [
+    HealthController,
     AuthController,
     OrgController,
     EventsController,

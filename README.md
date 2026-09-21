@@ -37,6 +37,17 @@ Then open <http://localhost:3000> and sign in.
 Optional: `pnpm dev:worker` (hourly finalisation, late-event recalculation,
 retention, Tier B provider pulls — needs Redis).
 
+## Deploy (Vercel + Render)
+
+The **dashboard** (`apps/web`) and **API** (`apps/api`) are separate services.
+The browser must not call `localhost` in production.
+
+1. **API** — Render Docker blueprint: [`render.yaml`](render.yaml) → `GET /v1/health`
+2. **Web** — Vercel, root directory `apps/web`, env `NEXT_PUBLIC_API_URL=https://<your-api-host>`
+3. **Connector** — still on each developer machine; activation uses `NEXT_PUBLIC_API_URL`
+
+Full steps: [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## The screens
 
 | Route | Who | What it answers |
