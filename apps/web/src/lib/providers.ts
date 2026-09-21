@@ -1,6 +1,8 @@
 export interface ProviderMeta {
   id: string;
   label: string;
+  /** Shorter label for tight table cells and `sm` badges */
+  shortLabel?: string;
   color: string;
   soft: string;
   ink: string;
@@ -25,10 +27,18 @@ const META: Record<string, ProviderMeta> = {
     note: "Observed through Claude Code hooks — full session, model, and tool telemetry.",
   },
   codex: { id: "codex", label: "Codex", color: "#0d9488", soft: "#f0fdfa", ink: "#115e59" },
-  gemini: { id: "gemini", label: "Gemini CLI", color: "#0ea5e9", soft: "#f0f9ff", ink: "#075985" },
+  gemini: {
+    id: "gemini",
+    label: "Gemini CLI",
+    shortLabel: "Gemini",
+    color: "#0ea5e9",
+    soft: "#f0f9ff",
+    ink: "#075985",
+  },
   github_copilot: {
     id: "github_copilot",
     label: "GitHub Copilot",
+    shortLabel: "Copilot",
     color: "#64748b",
     soft: "#f8fafc",
     ink: "#334155",
@@ -37,6 +47,7 @@ const META: Record<string, ProviderMeta> = {
   vscode: {
     id: "vscode",
     label: "VS Code companion",
+    shortLabel: "VS Code",
     color: "#7c3aed",
     soft: "#f5f3ff",
     ink: "#5b21b6",
@@ -59,4 +70,13 @@ export function providerMeta(id: string | null | undefined): ProviderMeta {
 
 export function providerLabel(id: string | null | undefined): string {
   return providerMeta(id).label;
+}
+
+export function providerBadgeLabel(
+  id: string | null | undefined,
+  size: "sm" | "md" = "md",
+): string {
+  const meta = providerMeta(id);
+  if (size === "sm" && meta.shortLabel) return meta.shortLabel;
+  return meta.label;
 }

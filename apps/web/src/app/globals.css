@@ -123,6 +123,15 @@
     @apply badge bg-slate-100 text-ink-700 ring-1 ring-inset ring-slate-200 dark:bg-white/10 dark:text-ink-700 dark:ring-white/10;
   }
 
+  .provider-badge {
+    background: var(--provider-bg);
+    color: var(--provider-fg);
+  }
+  .dark .provider-badge {
+    background: color-mix(in srgb, var(--provider-dot) 22%, transparent);
+    color: color-mix(in srgb, var(--provider-fg) 55%, white);
+  }
+
   /* ---------- controls ---------- */
   .btn {
     @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;

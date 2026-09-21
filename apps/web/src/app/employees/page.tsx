@@ -253,7 +253,7 @@ export default function EmployeesPage() {
                           {r.tools.length === 0 ? (
                             <span className="hint">None observed</span>
                           ) : (
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap items-center gap-1">
                               {r.tools.slice(0, 3).map((t) => (
                                 <ProviderBadge key={t.provider} provider={t.provider} size="sm" />
                               ))}
