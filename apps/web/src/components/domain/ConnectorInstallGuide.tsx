@@ -91,9 +91,9 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
               <code className="code-inline">pnpm dev:connector</code> from the project repo.
             </p>
           )}
-          {platform === "windows" ? (
+          {platform === "mac" || platform === "windows" ? (
             <p className="mt-2 text-xs text-ink-700">
-              Prerequisites:{" "}
+              Prerequisites: only{" "}
               <a
                 href="https://nodejs.org"
                 className="font-medium text-brand-700 underline dark:text-brand-400"
@@ -102,8 +102,9 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
               >
                 Node.js 20+
               </a>
-              , pnpm (<code className="code-inline">npm i -g pnpm</code>), and a clone of the Techlio
-              repo. The installer registers a sign-in task so port 9477 stays up.
+              . The installer downloads the agent from this site (no git clone), installs to{" "}
+              <code className="code-inline">~/.techlio/connector</code>, and keeps port 9477 running
+              at sign-in.
             </p>
           ) : null}
           {online === false ? (
