@@ -40,7 +40,7 @@ export async function claimLocalConnector(input: {
       ok: false,
       offline: true,
       message:
-        "The connector is not running on this computer. Keep pnpm dev running, then try again.",
+        "This page could not reach the connector at 127.0.0.1:9477. Keep pnpm dev running on this computer, then try again.",
     };
   }
 }
@@ -97,7 +97,7 @@ export function ThisComputerStatus() {
   if (state.kind === "offline") {
     return (
       <Callout tone="warn" title="Connector not running on this computer">
-        Start it with pnpm dev, then activate the admin-issued key on My connectors.
+        Start it on this computer with pnpm dev, then activate the admin-issued key.
       </Callout>
     );
   }

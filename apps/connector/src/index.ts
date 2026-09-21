@@ -170,15 +170,37 @@ function enqueueHeartbeat(): void {
 
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
+const DASHBOARD_ORIGINS = ["https://tracking-app-api-t9yd.vercel.app"];
+
+/** Localhost, the deployed dashboard, and any extra TECHLIO_DASHBOARD_ORIGINS. */
+function dashboardOriginAllowed(origin: string): boolean {
+  if (LOCAL_ORIGIN.test(origin)) return true;
+  const allowed = [
+    ...DASHBOARD_ORIGINS,
+    ...(process.env.TECHLIO_DASHBOARD_ORIGINS ?? "").split(","),
+  ]
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return allowed.some((pattern) => {
+    if (!pattern.includes("*")) return pattern === origin;
+    const expression = pattern
+      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, "[^/]+");
+    return new RegExp(`^${expression}$`).test(origin);
+  });
+}
+
 const app = Fastify({ logger: true });
 
 app.addHook("onRequest", async (req, reply) => {
   const origin = req.headers.origin;
-  if (typeof origin === "string" && LOCAL_ORIGIN.test(origin)) {
+  if (typeof origin === "string" && dashboardOriginAllowed(origin)) {
     reply.header("Access-Control-Allow-Origin", origin);
     reply.header("Vary", "Origin");
     reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    // Chrome blocks a public HTTPS page from calling 127.0.0.1 without this.
+    reply.header("Access-Control-Allow-Private-Network", "true");
   }
   if (req.method === "OPTIONS") {
     return reply.code(204).send();
