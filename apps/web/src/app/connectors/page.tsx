@@ -8,6 +8,7 @@ import { StatTile } from "@/components/ui/StatTile";
 import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock, StatSkeleton } from "@/components/ui/States";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
+import { ThisComputerStatus } from "@/components/domain/ConnectThisComputer";
 import { AlertList } from "@/components/domain/AlertList";
 import { SelectFilter, FilterBar, SearchFilter } from "@/components/filters/FilterBar";
 import { useApi } from "@/lib/use-api";
@@ -88,6 +89,10 @@ export default function ConnectorsPage() {
           <Callout tone="info" title={notice} />
         </div>
       ) : null}
+
+      <div className="mb-5">
+        <ThisComputerStatus />
+      </div>
 
       {query.loading ? (
         <StatSkeleton />

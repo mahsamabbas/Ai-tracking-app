@@ -27,7 +27,16 @@ export class OrgController {
     const user = userFromRequest(req);
     requireRoles(user, ["administrator"]);
     const users = await listPortalUsers(user.organizationId);
-    return { users };
+    const devices = await listOrgDevices(user.organizationId).catch(() => []);
+    const connected = new Set(
+      devices.filter((d) => !d.revokedAt).map((d) => d.developerId),
+    );
+    return {
+      users: users.map((u) => ({
+        ...u,
+        hasConnector: Boolean(u.developerId && connected.has(u.developerId)),
+      })),
+    };
   }
 
   @Post("users")

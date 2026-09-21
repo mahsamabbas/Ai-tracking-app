@@ -46,6 +46,12 @@ const NAV: NavItem[] = [
     match: (p) => p.startsWith("/employees") || p.startsWith("/sessions"),
   },
   {
+    href: "/my-connectors",
+    label: "My connectors",
+    roles: ["developer"],
+    icon: icon("M7 3v4M13 3v4M5.5 7h9v4a4.5 4.5 0 0 1-9 0V7ZM10 15.5V18"),
+  },
+  {
     href: "/connectors",
     label: "Connectors",
     roles: ["administrator", "manager", "auditor"],

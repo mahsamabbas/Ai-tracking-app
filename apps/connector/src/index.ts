@@ -9,6 +9,14 @@ import {
 } from "@techlio/event-schema";
 import { claudeHookToEvents } from "@techlio/provider-adapters";
 import { config } from "./config.js";
+import {
+  clearIdentity,
+  loadIdentity,
+  publicIdentity,
+  saveIdentity,
+  type ConnectorIdentity,
+} from "./identity.js";
+import { claimFromPortal } from "./pairing.js";
 import { EncryptedQueue } from "./queue.js";
 import { loadOrCreateSigningKey } from "./signing.js";
 import { sanitizeEvent } from "./redaction.js";
@@ -19,6 +27,7 @@ let paused = false;
 let hostProvider = config.provider;
 let activeSessionId: string | undefined;
 let contextLabel: string | undefined;
+let identity: ConnectorIdentity | null = loadIdentity();
 
 function defaultStatus(
   eventType: ActivityEvent["event_type"],
@@ -31,26 +40,44 @@ function defaultStatus(
   }
   return undefined;
 }
-const deviceToken = config.deviceToken;
+
 const signingKey = loadOrCreateSigningKey(config.signingKeyHex);
 mkdirSync(dirname(config.dbPath), { recursive: true });
-const queue = new EncryptedQueue(config.dbPath, deviceToken);
+const queue = new EncryptedQueue(config.dbPath, "techlio-local-queue");
+
+function apiBase(): string {
+  return identity?.apiBaseUrl ?? config.apiBaseUrl;
+}
 
 function connectorCtx(provider: string) {
+  if (!identity) {
+    throw new Error("unpaired");
+  }
   return {
-    organizationId: config.organizationId,
-    developerId: config.developerId,
-    deviceId: config.deviceId,
+    organizationId: identity.organizationId,
+    developerId: identity.developerId,
+    deviceId: identity.deviceId,
     connectorVersion: config.connectorVersion,
     consentVersion: config.consentVersion,
     provider,
   };
 }
 
+function stamp(event: ActivityEvent): ActivityEvent {
+  if (!identity) return event;
+  return {
+    ...event,
+    organization_id: identity.organizationId,
+    developer_id: identity.developerId,
+    device_id: identity.deviceId,
+  };
+}
+
 function baseEvent(
   eventType: ActivityEvent["event_type"],
   extra?: Partial<ActivityEvent>,
-): ActivityEvent {
+): ActivityEvent | null {
+  if (!identity) return null;
   const meta = { ...(extra?.metadata ?? {}) };
   if (contextLabel && !meta.path_category) {
     meta.path_category = contextLabel.slice(0, 64);
@@ -58,9 +85,9 @@ function baseEvent(
   return {
     event_id: crypto.randomUUID(),
     schema_version: "1.0.0",
-    organization_id: config.organizationId,
-    developer_id: config.developerId,
-    device_id: config.deviceId,
+    organization_id: identity.organizationId,
+    developer_id: identity.developerId,
+    device_id: identity.deviceId,
     provider: hostProvider,
     connector_version: config.connectorVersion,
     event_type: eventType,
@@ -74,13 +101,13 @@ function baseEvent(
 }
 
 async function flushQueue(): Promise<void> {
-  if (paused) return;
-  const batch = queue.dequeueBatch();
+  if (paused || !identity) return;
+  const batch = queue.dequeueBatch().map(stamp);
   if (batch.length === 0) return;
   try {
     const ok = await uploadBatch(
-      config.apiBaseUrl,
-      deviceToken,
+      apiBase(),
+      identity.deviceToken,
       signingKey,
       batch,
     );
@@ -91,55 +118,67 @@ async function flushQueue(): Promise<void> {
 }
 
 async function postApiHeartbeat(): Promise<void> {
+  if (!identity) return;
   const caps = providerCapability(hostProvider);
   try {
-    await fetch(
-      `${config.apiBaseUrl}/v1/connectors/${config.deviceId}/heartbeat`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${deviceToken}`,
-        },
-        body: JSON.stringify({
-          version: config.connectorVersion,
-          queueDepth: queue.depth(),
-          paused,
-          provider: hostProvider,
-          capabilities: {
-            hourly: caps?.hourly ?? false,
-            missing: caps?.missing ?? [],
-            tier: caps?.tier ?? "B",
-          },
-        }),
+    await fetch(`${apiBase()}/v1/connectors/${identity.deviceId}/heartbeat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${identity.deviceToken}`,
       },
-    );
+      body: JSON.stringify({
+        version: config.connectorVersion,
+        queueDepth: queue.depth(),
+        paused,
+        provider: hostProvider,
+        capabilities: {
+          hourly: caps?.hourly ?? false,
+          missing: caps?.missing ?? [],
+          tier: caps?.tier ?? "B",
+        },
+      }),
+    });
   } catch {
     /* API may be down; event queue still retries */
   }
 }
 
 function enqueueHeartbeat(): void {
-  if (paused) return;
+  if (paused || !identity) return;
   const caps = providerCapability(hostProvider);
-  queue.enqueue([
-    baseEvent(EventTypes.heartbeat_sent, {
-      metadata: {
-        tool_category: "other",
-        queue_depth: queue.depth(),
-        connector_paused: paused,
-        provider_name: caps?.label,
-        tier: caps?.tier,
-        daily_only: caps ? !caps.hourly : true,
-        capabilities_missing: caps?.missing?.slice(0, 8).join(","),
-      },
-    }),
-  ]);
+  const event = baseEvent(EventTypes.heartbeat_sent, {
+    metadata: {
+      tool_category: "other",
+      queue_depth: queue.depth(),
+      connector_paused: paused,
+      provider_name: caps?.label,
+      tier: caps?.tier,
+      daily_only: caps ? !caps.hourly : true,
+      capabilities_missing: caps?.missing?.slice(0, 8).join(","),
+    },
+  });
+  if (event) queue.enqueue([event]);
   void flushQueue();
   void postApiHeartbeat();
 }
 
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
 const app = Fastify({ logger: true });
+
+app.addHook("onRequest", async (req, reply) => {
+  const origin = req.headers.origin;
+  if (typeof origin === "string" && LOCAL_ORIGIN.test(origin)) {
+    reply.header("Access-Control-Allow-Origin", origin);
+    reply.header("Vary", "Origin");
+    reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  }
+  if (req.method === "OPTIONS") {
+    return reply.code(204).send();
+  }
+});
 
 app.get("/health", async () => {
   const caps = providerCapability(hostProvider);
@@ -148,6 +187,7 @@ app.get("/health", async () => {
     queueDepth: queue.depth(),
     version: config.connectorVersion,
     provider: hostProvider,
+    ...publicIdentity(identity),
     capabilities: {
       hourly: caps?.hourly ?? false,
       otlp: hostProvider === "claude_code",
@@ -159,6 +199,71 @@ app.get("/health", async () => {
   };
 });
 
+app.get("/identity", async () => publicIdentity(identity));
+
+app.post("/claim", async (req, reply) => {
+  const body = (req.body ?? {}) as {
+    accessToken?: string;
+    developerId?: string;
+    displayName?: string;
+    apiBaseUrl?: string;
+    provider?: string;
+    label?: string;
+  };
+  if (!body.accessToken) {
+    return reply.code(400).send({ error: "access_token_required" });
+  }
+  try {
+    identity = await claimFromPortal({
+      accessToken: body.accessToken,
+      developerId: body.developerId,
+      displayName: body.displayName,
+      apiBaseUrl: body.apiBaseUrl ?? config.apiBaseUrl,
+      provider: body.provider,
+      label: body.label,
+    });
+    queue.clear();
+    if (body.provider) hostProvider = body.provider;
+    enqueueHeartbeat();
+    return publicIdentity(identity);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "claim_failed";
+    const code =
+      message === "not_signed_in"
+        ? 401
+        : message === "developer_required"
+          ? 400
+          : 502;
+    return reply.code(code).send({ error: message });
+  }
+});
+
+app.post("/enable-tool", async (req, reply) => {
+  if (!identity) {
+    return reply.code(409).send({ error: "unpaired" });
+  }
+  const body = (req.body ?? {}) as { provider?: string };
+  const provider = body.provider?.trim();
+  if (!provider) {
+    return reply.code(400).send({ error: "provider_required" });
+  }
+  const providers = [
+    ...new Set([...(identity.providers ?? []), identity.provider, provider].filter(
+      (p): p is string => Boolean(p),
+    )),
+  ];
+  identity = { ...identity, providers, provider: identity.provider ?? provider };
+  saveIdentity(identity);
+  return publicIdentity(identity);
+});
+
+app.post("/unpair", async () => {
+  clearIdentity();
+  identity = null;
+  queue.clear();
+  return { paired: false as const };
+});
+
 /** IDE companion declares the real host (Cursor, VS Code, …). */
 app.post("/host", async (req) => {
   const body = req.body as { provider?: string; appName?: string };
@@ -167,18 +272,18 @@ app.post("/host", async (req) => {
     providerFromHostApp(body.appName) ??
     hostProvider;
   enqueueHeartbeat();
-  return { provider: hostProvider };
+  return { provider: hostProvider, ...publicIdentity(identity) };
 });
 
 function enqueueCoverageGap(reason: "paused" | "offline"): void {
-  queue.enqueue([
-    baseEvent(EventTypes.telemetry_gap_started, {
-      metadata: { gap_reason: reason, connector_paused: reason === "paused" },
-    }),
-    baseEvent(EventTypes.connector_paused, {
-      metadata: { connector_paused: true, queue_depth: queue.depth() },
-    }),
-  ]);
+  const started = baseEvent(EventTypes.telemetry_gap_started, {
+    metadata: { gap_reason: reason, connector_paused: reason === "paused" },
+  });
+  const pausedEv = baseEvent(EventTypes.connector_paused, {
+    metadata: { connector_paused: true, queue_depth: queue.depth() },
+  });
+  const batch = [started, pausedEv].filter((e): e is ActivityEvent => e !== null);
+  if (batch.length) queue.enqueue(batch);
   void flushQueue();
 }
 
@@ -191,21 +296,22 @@ app.post("/pause", async () => {
 
 app.post("/resume", async () => {
   paused = false;
-  queue.enqueue([
-    baseEvent(EventTypes.connector_resumed, {
-      metadata: { connector_paused: false },
-    }),
-    baseEvent(EventTypes.telemetry_gap_ended, {
-      metadata: { gap_reason: "paused" },
-    }),
-  ]);
+  const resumed = baseEvent(EventTypes.connector_resumed, {
+    metadata: { connector_paused: false },
+  });
+  const ended = baseEvent(EventTypes.telemetry_gap_ended, {
+    metadata: { gap_reason: "paused" },
+  });
+  const batch = [resumed, ended].filter((e): e is ActivityEvent => e !== null);
+  if (batch.length) queue.enqueue(batch);
   void flushQueue();
   void postApiHeartbeat();
   return { paused: false };
 });
 
 app.post("/hooks/extension", async (req) => {
-  if (paused) return { accepted: 0 };
+  if (paused) return { accepted: 0, unpaired: !identity };
+  if (!identity) return { accepted: 0, unpaired: true };
   const body = req.body as Record<string, unknown>;
   if (typeof body.appName === "string" || typeof body.provider === "string") {
     hostProvider =
@@ -269,7 +375,7 @@ app.post("/hooks/extension", async (req) => {
         : {}),
     },
   });
-  const clean = sanitizeEvent(event);
+  const clean = event ? sanitizeEvent(event) : null;
   if (clean) {
     queue.enqueue([clean]);
     void flushQueue();
@@ -280,6 +386,7 @@ app.post("/hooks/extension", async (req) => {
 
 app.post("/hooks/claude", async (req) => {
   if (paused) return { accepted: 0 };
+  if (!identity) return { accepted: 0, unpaired: true };
   const events = claudeHookToEvents(
     req.body as Record<string, unknown>,
     connectorCtx("claude_code"),
@@ -304,9 +411,22 @@ setInterval(() => {
 }, 30_000);
 
 const port = config.port;
-app.listen({ port, host: "127.0.0.1" }).then(() => {
-  setTimeout(() => enqueueHeartbeat(), 3_000);
-}).catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+app
+  .listen({ port, host: "127.0.0.1" })
+  .then(() => {
+    if (identity) {
+      app.log.info(
+        { developerId: identity.developerId, displayName: identity.displayName },
+        "Connector paired",
+      );
+      setTimeout(() => enqueueHeartbeat(), 3_000);
+    } else {
+      app.log.info(
+        "Connector unpaired — developer can add tools from My connectors in the portal",
+      );
+    }
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

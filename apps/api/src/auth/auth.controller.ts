@@ -9,6 +9,7 @@ import {
 import {
   authenticatePortalUser,
   homePathForRole,
+  listDeveloperDevices,
   seedPortalUsers,
 } from "@techlio/server-core";
 import { signUserToken, verifyUserToken } from "./jwt.js";
@@ -26,6 +27,11 @@ export class AuthController {
       ...user,
       developerId: user.developerId ?? undefined,
     });
+    let homePath = homePathForRole(user.role, user.developerId);
+    if (user.role === "developer" && user.developerId) {
+      const mine = await listDeveloperDevices(user.organizationId, user.developerId);
+      if (mine.length === 0) homePath = "/my-connectors";
+    }
     return {
       token,
       user: {
@@ -36,7 +42,7 @@ export class AuthController {
         organizationId: user.organizationId,
         developerId: user.developerId ?? null,
       },
-      homePath: homePathForRole(user.role, user.developerId),
+      homePath,
     };
   }
 

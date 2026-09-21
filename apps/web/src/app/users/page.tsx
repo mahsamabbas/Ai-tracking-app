@@ -7,6 +7,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
+import { ConnectThisComputer } from "@/components/domain/ConnectThisComputer";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiPost } from "@/lib/api";
@@ -18,7 +19,9 @@ interface OrgUser {
   email: string;
   displayName: string;
   role: Role;
+  organizationId: string;
   developerId?: string | null;
+  hasConnector?: boolean;
 }
 
 const ROLE_TONE: Record<Role, "info" | "ok" | "neutral" | "warn"> = {
@@ -45,10 +48,18 @@ export default function UsersPage() {
     setBusy(true);
     setNotice(null);
     try {
-      const res = await apiPost<{ error?: string }>("/v1/users", token, form);
+      const res = await apiPost<{ error?: string; user?: OrgUser }>("/v1/users", token, form);
       if (res.error) throw new Error(res.error.replace(/_/g, " "));
+      const createdName = form.displayName;
+      const role = form.role;
       setForm({ displayName: "", email: "", password: "", role: "developer" });
-      setNotice({ tone: "info", text: `${form.displayName} was added to the organisation.` });
+      setNotice({
+        tone: "info",
+        text:
+          role === "developer"
+            ? `${createdName} can sign in. They add Cursor or another tool from My connectors in their portal.`
+            : `${createdName} can sign in. Only the Developer role is monitored; managers and admins use the dashboard without pairing a connector.`,
+      });
       query.reload();
     } catch (err) {
       setNotice({
@@ -65,7 +76,7 @@ export default function UsersPage() {
   return (
     <AppShell
       title="Access"
-      subtitle="Organisation membership and role scope (administrators only)"
+      subtitle="Dashboard logins, roles, and pairing this computer to a monitored person"
     >
       {notice ? (
         <div className="mb-5">
@@ -73,9 +84,35 @@ export default function UsersPage() {
         </div>
       ) : null}
 
+      <section className="mb-5 grid gap-3 md:grid-cols-3">
+        <div className="card-pad">
+          <p className="label">1. Dashboard login</p>
+          <p className="mt-1.5 text-sm text-ink-700">
+            A user account lets them open Techlio. It does not watch Cursor or any other tool.
+          </p>
+        </div>
+        <div className="card-pad">
+          <p className="label">2. Pair this computer</p>
+          <p className="mt-1.5 text-sm text-ink-700">
+            That person signs in and opens My connectors. They pick the AI tool and connect this
+            computer themselves — you do not paste env vars for them.
+          </p>
+        </div>
+        <div className="card-pad">
+          <p className="label">3. IDE companion</p>
+          <p className="mt-1.5 text-sm text-ink-700">
+            Install the Techlio companion in Cursor or VS Code on that machine. Activity follows
+            the paired person, not a .env file.
+          </p>
+        </div>
+      </section>
+
       <div className="grid gap-4 xl:grid-cols-3">
         <Card>
-          <CardHeader title="Add a user" subtitle="Roles decide what every API and screen returns" />
+          <CardHeader
+            title="Add a user"
+            subtitle="Developer = login. Pairing on their computer starts monitoring."
+          />
           <CardBody>
             <form className="space-y-3" onSubmit={onCreate}>
               <label className="block">
@@ -125,10 +162,6 @@ export default function UsersPage() {
                 {busy ? "Creating…" : "Create user"}
               </button>
             </form>
-            <p className="hint mt-4">
-              Creating a developer also issues a developer id, which every event they generate is
-              scoped to. Registration is written to the audit log.
-            </p>
           </CardBody>
         </Card>
 
@@ -156,7 +189,8 @@ export default function UsersPage() {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
-                    <th>Monitored activity</th>
+                    <th>This computer</th>
+                    <th>Activity</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -169,6 +203,16 @@ export default function UsersPage() {
                       </td>
                       <td>
                         {u.developerId ? (
+                          <ConnectThisComputer
+                            developerId={u.developerId}
+                            displayName={u.displayName}
+                          />
+                        ) : (
+                          <span className="hint">Not monitored</span>
+                        )}
+                      </td>
+                      <td>
+                        {u.developerId ? (
                           <Link
                             href={`/employees/${u.developerId}`}
                             className="text-xs font-medium text-brand-600 hover:text-brand-700"
@@ -176,7 +220,7 @@ export default function UsersPage() {
                             View analytics →
                           </Link>
                         ) : (
-                          <span className="hint">Not monitored</span>
+                          <span className="hint">—</span>
                         )}
                       </td>
                     </tr>

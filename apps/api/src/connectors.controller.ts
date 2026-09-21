@@ -24,6 +24,8 @@ import {
   canPauseConnector,
   canRegisterConnector,
   canViewConnectorHealth,
+  ensureEmployee,
+  listPortalUsers,
   DEV_ORG,
 } from "@techlio/server-core";
 import { eq } from "drizzle-orm";
@@ -52,7 +54,7 @@ export class ConnectorsController {
   @UseGuards(DashboardAuthGuard)
   async register(
     @Req() req: FastifyRequest,
-    @Body() body: { developerId?: string; publicKey?: string },
+    @Body() body: { developerId?: string; publicKey?: string; provider?: string; label?: string },
   ) {
     const user = userFromRequest(req);
     const developerId = body.developerId ?? user.developerId;
@@ -62,11 +64,26 @@ export class ConnectorsController {
     if (!canRegisterConnector(user, developerId)) {
       throw new ForbiddenException("role_forbidden");
     }
+    const members = await listPortalUsers(user.organizationId);
+    const member = members.find((m) => m.developerId === developerId);
+    if (member?.developerId) {
+      await ensureEmployee({
+        id: member.developerId,
+        organizationId: user.organizationId,
+        displayName: member.displayName,
+        email: member.email,
+      });
+    }
+    const provider = body.provider ?? "cursor";
     return registerDevice({
       organizationId: user.organizationId,
       developerId,
       publicKey: body.publicKey,
       actorId: user.id,
+      provider,
+      label:
+        body.label?.trim() ||
+        (member ? `${member.displayName}'s ${provider}` : "Workstation connector"),
     });
   }
 

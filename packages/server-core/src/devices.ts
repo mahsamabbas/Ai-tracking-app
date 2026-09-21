@@ -39,6 +39,8 @@ export async function registerDevice(input: {
   developerId: string;
   publicKey?: string;
   actorId?: string;
+  provider?: string | null;
+  label?: string | null;
 }): Promise<{ deviceId: string; token: string }> {
   const deviceId = randomUUID();
   const token = randomBytes(32).toString("base64url");
@@ -48,6 +50,8 @@ export async function registerDevice(input: {
     developerId: input.developerId,
     tokenHash: hashDeviceToken(token),
     publicKey: input.publicKey ?? null,
+    provider: input.provider ?? "cursor",
+    label: input.label ?? "Workstation connector",
     revokedAt: null,
     createdAt: new Date(),
   });
@@ -89,6 +93,22 @@ export async function listOrgDevices(organizationId: string) {
     .select()
     .from(devices)
     .where(eq(devices.organizationId, organizationId));
+}
+
+export async function listDeveloperDevices(
+  organizationId: string,
+  developerId: string,
+) {
+  return db
+    .select()
+    .from(devices)
+    .where(
+      and(
+        eq(devices.organizationId, organizationId),
+        eq(devices.developerId, developerId),
+        isNull(devices.revokedAt),
+      ),
+    );
 }
 
 export async function getDevice(

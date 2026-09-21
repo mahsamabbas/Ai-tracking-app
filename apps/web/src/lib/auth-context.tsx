@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         /* private mode */
       }
-      router.push(homePathForRole(json.user.role, json.user.developerId));
+      router.push(json.homePath ?? homePathForRole(json.user.role, json.user.developerId));
     },
     [router],
   );

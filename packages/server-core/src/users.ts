@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { db } from "./db.js";
-import { portalUsers, auditLog } from "./schema.js";
+import { portalUsers, auditLog, employees } from "./schema.js";
 import type { Role } from "./roles.js";
 
 export const DEV_ORG = "550e8400-e29b-41d4-a716-446655440010";
@@ -109,6 +109,18 @@ export async function authenticatePortalUser(
       detail: { email: row.email, role: row.role },
       createdAt: new Date(),
     });
+    if (row.developerId) {
+      try {
+        await ensureEmployee({
+          id: row.developerId,
+          organizationId: row.organizationId,
+          displayName: row.displayName,
+          email: row.email,
+        });
+      } catch {
+        /* directory row is best-effort so login still succeeds */
+      }
+    }
     return toPublic(row);
   }
 
@@ -175,6 +187,14 @@ export async function createPortalUser(input: {
     role: input.role,
     developerId,
   });
+  if (developerId) {
+    await ensureEmployee({
+      id: developerId,
+      organizationId: input.organizationId,
+      displayName: input.displayName.trim(),
+      email,
+    });
+  }
   await db.insert(auditLog).values({
     organizationId: input.organizationId,
     actorId: input.actorId,
@@ -190,6 +210,27 @@ export async function createPortalUser(input: {
     organizationId: input.organizationId,
     developerId,
   };
+}
+
+/** Directory row the analytics screens join on. Login alone is not enough. */
+export async function ensureEmployee(input: {
+  id: string;
+  organizationId: string;
+  displayName: string;
+  email?: string | null;
+}): Promise<void> {
+  await db
+    .insert(employees)
+    .values({
+      id: input.id,
+      organizationId: input.organizationId,
+      displayName: input.displayName,
+      email: input.email ?? null,
+      status: "active",
+      joinedAt: new Date(),
+      createdAt: new Date(),
+    })
+    .onConflictDoNothing();
 }
 
 export async function listAuditLog(

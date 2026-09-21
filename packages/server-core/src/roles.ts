@@ -78,7 +78,7 @@ export function homePathForRole(role: Role, developerId?: string | null): string
 }
 
 export function navForRole(role: Role): string[] {
-  if (role === "developer") return ["/", "/employees/:self", "/policy"];
+  if (role === "developer") return ["/", "/employees/:self", "/my-connectors", "/policy"];
   if (role === "auditor") return ["/audit", "/connectors", "/policy"];
   if (role === "administrator") {
     return ["/", "/employees", "/connectors", "/users", "/audit", "/policy"];

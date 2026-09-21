@@ -79,7 +79,7 @@ const EMPTY_COPY: Record<EmptyVariant, { title: string; body: string }> = {
   },
   "connector-offline": {
     title: "Connector offline",
-    body: "No telemetry was received for this period. Missing telemetry is not evidence of inactivity.",
+    body: "No telemetry was received. Signing in does not collect activity — the workstation connector and IDE companion must be running. Missing telemetry is not evidence of inactivity.",
   },
   paused: {
     title: "Collection paused",

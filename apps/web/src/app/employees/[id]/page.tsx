@@ -21,6 +21,8 @@ import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
 import { ConnectorBadge } from "@/components/domain/Badges";
+import { ConnectThisComputer } from "@/components/domain/ConnectThisComputer";
+import { AddConnectorForm } from "@/components/domain/AddConnectorForm";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { SessionTable } from "@/components/domain/SessionTable";
 import { ToolCard } from "@/components/domain/ToolCard";
@@ -38,7 +40,7 @@ import {
   initialsOf,
 } from "@/lib/format";
 import { classificationOf, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
-import { canViewTeam } from "@/lib/permissions";
+import { canViewTeam, canManageUsers } from "@/lib/permissions";
 import type { ActivityEventRow, EmployeeAnalytics, LiveStatus } from "@/lib/types";
 
 export default function EmployeeDetailPage() {
@@ -186,6 +188,16 @@ export default function EmployeeDetailPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {isSelf ? (
+                  <Link href="/my-connectors" className="btn-ghost h-8 text-xs">
+                    My connectors
+                  </Link>
+                ) : canManageUsers(user?.role) && user?.developerId !== id ? (
+                  <ConnectThisComputer
+                    developerId={id}
+                    displayName={d.employee.displayName}
+                  />
+                ) : null}
                 {d.devices.length === 0 ? (
                   <span className="badge-warn">No connector registered</span>
                 ) : (
@@ -201,6 +213,23 @@ export default function EmployeeDetailPage() {
               </div>
             </div>
           </Card>
+
+          {isSelf && d.devices.filter((x) => !x.isDemo).length === 0 ? (
+            <Card className="mb-5">
+              <CardHeader
+                title="Add a connector"
+                subtitle="Activity is collected after you add an AI tool on this computer"
+                href="/my-connectors"
+                hrefLabel="All connectors"
+              />
+              <CardBody>
+                <AddConnectorForm
+                  developerId={id}
+                  displayName={d.employee.displayName}
+                />
+              </CardBody>
+            </Card>
+          ) : null}
 
           {worstLive ? (
             <div className="mb-5">

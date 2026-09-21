@@ -60,8 +60,12 @@ export class EncryptedQueue {
     const events: ActivityEvent[] = [];
     const del = this.db.prepare("DELETE FROM pending WHERE id = ?");
     for (const row of rows) {
-      const parsed = JSON.parse(this.decrypt(row.payload)) as ActivityEvent[];
-      events.push(...parsed);
+      try {
+        const parsed = JSON.parse(this.decrypt(row.payload)) as ActivityEvent[];
+        events.push(...parsed);
+      } catch {
+        /* old key or corrupt row */
+      }
       del.run(row.id);
     }
     return events;
@@ -72,5 +76,9 @@ export class EncryptedQueue {
       .prepare("SELECT COUNT(*) as c FROM pending")
       .get() as { c: number };
     return row.c;
+  }
+
+  clear(): void {
+    this.db.exec("DELETE FROM pending");
   }
 }

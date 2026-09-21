@@ -1,17 +1,43 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** Optional local env for API URL / port — identity is claimed, not stored here. */
+function loadLocalEnv(): void {
+  const candidates = [
+    join(dirname(fileURLToPath(import.meta.url)), "../.env"),
+    join(process.cwd(), ".env"),
+    join(process.cwd(), "apps/connector/.env"),
+  ];
+  for (const envPath of candidates) {
+    if (!existsSync(envPath)) continue;
+    for (const raw of readFileSync(envPath, "utf8").split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || line.startsWith("#")) continue;
+      const eq = line.indexOf("=");
+      if (eq < 1) continue;
+      const key = line.slice(0, eq).trim();
+      let value = line.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      if (process.env[key] === undefined) process.env[key] = value;
+    }
+    break;
+  }
+}
+
+loadLocalEnv();
+
 export const config = {
   port: Number(process.env.CONNECTOR_PORT ?? 9477),
   apiBaseUrl: process.env.TECHLIO_API_URL ?? "http://localhost:3001",
-  organizationId:
-    process.env.TECHLIO_ORG_ID ?? "550e8400-e29b-41d4-a716-446655440010",
-  developerId:
-    process.env.TECHLIO_DEV_ID ?? "550e8400-e29b-41d4-a716-446655440011",
-  deviceId:
-    process.env.TECHLIO_DEVICE_ID ?? "550e8400-e29b-41d4-a716-446655440012",
   consentVersion: process.env.TECHLIO_CONSENT_VERSION ?? "1",
   connectorVersion: "0.1.0",
-  /** Host agent. Cursor is the local IDE; override with TECHLIO_PROVIDER. */
   provider: process.env.TECHLIO_PROVIDER ?? "cursor",
   dbPath: process.env.CONNECTOR_DB ?? ".techlio-connector/queue.db",
   signingKeyHex: process.env.CONNECTOR_SIGNING_KEY_HEX,
-  deviceToken: process.env.TECHLIO_DEVICE_TOKEN ?? "dev-device-token",
 };
