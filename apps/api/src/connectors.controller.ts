@@ -14,7 +14,6 @@ import type { FastifyRequest } from "fastify";
 import {
   db,
   connectorHealth,
-  auditLog,
   registerDevice,
   revokeDevice,
   verifyDeviceToken,
@@ -23,6 +22,8 @@ import {
   ingestBatch,
   getDevice,
   bindDevicePublicKey,
+  writeAudit,
+  setConnectorPaused,
   canPauseConnector,
   canRegisterConnector,
   canViewConnectorHealth,
@@ -141,7 +142,7 @@ export class ConnectorsController {
     if (!bound) {
       throw new ForbiddenException("signing_key_mismatch");
     }
-    await db.insert(auditLog).values({
+    await writeAudit({
       organizationId: verified.organizationId,
       actorId: user.id,
       action: "connector.consent_accepted",
@@ -150,7 +151,6 @@ export class ConnectorsController {
         developerId: verified.developerId,
         consentVersion: body.consentVersion.trim().slice(0, 64),
       },
-      createdAt: new Date(),
     });
     return {
       deviceId: device.id,
@@ -291,18 +291,12 @@ export class ConnectorsController {
       throw new NotFoundException("device_not_found");
     }
 
-    await db
-      .insert(connectorHealth)
-      .values({
-        deviceId: id,
-        organizationId: user.organizationId,
-        paused: paused ? 1 : 0,
-        provider: device.provider,
-      })
-      .onConflictDoUpdate({
-        target: connectorHealth.deviceId,
-        set: { paused: paused ? 1 : 0 },
-      });
+    await setConnectorPaused({
+      deviceId: id,
+      organizationId: user.organizationId,
+      provider: device.provider,
+      paused,
+    });
 
     const gapEvent = {
       event_id: randomUUID(),
@@ -324,12 +318,11 @@ export class ConnectorsController {
 
     await ingestBatch(user.organizationId, { events: [gapEvent] }, id);
 
-    await db.insert(auditLog).values({
+    await writeAudit({
       organizationId: user.organizationId,
       actorId: user.id,
       action: paused ? "connector.pause" : "connector.resume",
       detail: { deviceId: id, developerId: resolved.developerId },
-      createdAt: new Date(),
     });
     return { paused, coverageGap: paused };
   }

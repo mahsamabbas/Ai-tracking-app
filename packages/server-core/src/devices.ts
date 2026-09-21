@@ -5,6 +5,42 @@ import { db } from "./db.js";
 import { auditLog, connectorHealth, devices } from "./schema.js";
 import { DEV_DEVELOPER_ALEX, DEV_ORG } from "./users.js";
 
+export async function writeAudit(input: {
+  organizationId: string;
+  actorId?: string | null;
+  action: string;
+  detail?: unknown;
+}): Promise<void> {
+  await db.insert(auditLog).values({
+    organizationId: input.organizationId,
+    actorId: input.actorId ?? null,
+    action: input.action,
+    detail: input.detail ?? null,
+    createdAt: new Date(),
+  });
+}
+
+export async function setConnectorPaused(input: {
+  deviceId: string;
+  organizationId: string;
+  provider: string | null;
+  paused: boolean;
+}): Promise<void> {
+  const pausedFlag = input.paused ? 1 : 0;
+  await db
+    .insert(connectorHealth)
+    .values({
+      deviceId: input.deviceId,
+      organizationId: input.organizationId,
+      paused: pausedFlag,
+      provider: input.provider,
+    })
+    .onConflictDoUpdate({
+      target: connectorHealth.deviceId,
+      set: { paused: pausedFlag },
+    });
+}
+
 export function hashDeviceToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
