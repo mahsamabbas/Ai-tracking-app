@@ -35,14 +35,16 @@ export async function apiPost<T>(
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    // Fastify rejects Content-Type: application/json with an empty body.
+    body: JSON.stringify(body ?? {}),
   });
   const json = await r.json().catch(() => ({}));
   if (!r.ok) {
-    throw new ApiError(
-      (json as { message?: string }).message ?? `Request failed (${r.status})`,
-      r.status,
-    );
+    const raw = (json as { message?: string | string[] }).message;
+    const message = Array.isArray(raw)
+      ? raw.join(", ")
+      : raw ?? `Request failed (${r.status})`;
+    throw new ApiError(message, r.status);
   }
   return json as T;
 }

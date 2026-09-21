@@ -38,11 +38,9 @@ export function canManageConnectors(user: AuthUser): boolean {
 
 export function canRegisterConnector(
   user: AuthUser,
-  developerId: string,
+  _developerId: string,
 ): boolean {
-  if (user.role === "administrator") return true;
-  if (user.role === "developer") return user.developerId === developerId;
-  return false;
+  return user.role === "administrator";
 }
 
 export function canPauseConnector(user: AuthUser, developerId: string): boolean {

@@ -204,26 +204,27 @@ app.get("/identity", async () => publicIdentity(identity));
 app.post("/claim", async (req, reply) => {
   const body = (req.body ?? {}) as {
     accessToken?: string;
-    developerId?: string;
+    deviceId?: string;
+    deviceToken?: string;
     displayName?: string;
     apiBaseUrl?: string;
-    provider?: string;
-    label?: string;
   };
   if (!body.accessToken) {
     return reply.code(400).send({ error: "access_token_required" });
   }
+  if (!body.deviceId || !body.deviceToken) {
+    return reply.code(400).send({ error: "admin_issued_keys_required" });
+  }
   try {
     identity = await claimFromPortal({
       accessToken: body.accessToken,
-      developerId: body.developerId,
+      deviceId: body.deviceId,
+      deviceToken: body.deviceToken,
       displayName: body.displayName,
       apiBaseUrl: body.apiBaseUrl ?? config.apiBaseUrl,
-      provider: body.provider,
-      label: body.label,
     });
     queue.clear();
-    if (body.provider) hostProvider = body.provider;
+    if (identity.provider) hostProvider = identity.provider;
     enqueueHeartbeat();
     return publicIdentity(identity);
   } catch (err) {
@@ -231,30 +232,13 @@ app.post("/claim", async (req, reply) => {
     const code =
       message === "not_signed_in"
         ? 401
-        : message === "developer_required"
-          ? 400
-          : 502;
+        : message === "invalid_connector_key" || message === "not_your_key"
+          ? 403
+          : message === "admin_issued_keys_required"
+            ? 400
+            : 502;
     return reply.code(code).send({ error: message });
   }
-});
-
-app.post("/enable-tool", async (req, reply) => {
-  if (!identity) {
-    return reply.code(409).send({ error: "unpaired" });
-  }
-  const body = (req.body ?? {}) as { provider?: string };
-  const provider = body.provider?.trim();
-  if (!provider) {
-    return reply.code(400).send({ error: "provider_required" });
-  }
-  const providers = [
-    ...new Set([...(identity.providers ?? []), identity.provider, provider].filter(
-      (p): p is string => Boolean(p),
-    )),
-  ];
-  identity = { ...identity, providers, provider: identity.provider ?? provider };
-  saveIdentity(identity);
-  return publicIdentity(identity);
 });
 
 app.post("/unpair", async () => {

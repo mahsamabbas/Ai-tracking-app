@@ -21,8 +21,6 @@ import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
 import { ConnectorBadge } from "@/components/domain/Badges";
-import { ConnectThisComputer } from "@/components/domain/ConnectThisComputer";
-import { AddConnectorForm } from "@/components/domain/AddConnectorForm";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { SessionTable } from "@/components/domain/SessionTable";
 import { ToolCard } from "@/components/domain/ToolCard";
@@ -192,11 +190,10 @@ export default function EmployeeDetailPage() {
                   <Link href="/my-connectors" className="btn-ghost h-8 text-xs">
                     My connectors
                   </Link>
-                ) : canManageUsers(user?.role) && user?.developerId !== id ? (
-                  <ConnectThisComputer
-                    developerId={id}
-                    displayName={d.employee.displayName}
-                  />
+                ) : canManageUsers(user?.role) ? (
+                  <Link href="/connectors" className="btn-ghost h-8 text-xs">
+                    Connector health
+                  </Link>
                 ) : null}
                 {d.devices.length === 0 ? (
                   <span className="badge-warn">No connector registered</span>
@@ -215,20 +212,20 @@ export default function EmployeeDetailPage() {
           </Card>
 
           {isSelf && d.devices.filter((x) => !x.isDemo).length === 0 ? (
-            <Card className="mb-5">
-              <CardHeader
-                title="Add a connector"
-                subtitle="Activity is collected after you add an AI tool on this computer"
-                href="/my-connectors"
-                hrefLabel="All connectors"
-              />
-              <CardBody>
-                <AddConnectorForm
-                  developerId={id}
-                  displayName={d.employee.displayName}
-                />
-              </CardBody>
-            </Card>
+            <div className="mb-5">
+              <Callout
+                tone="warn"
+                title="No connector is sending activity yet"
+                action={
+                  <Link href="/my-connectors" className="btn-ghost h-8 text-xs">
+                    Activate key →
+                  </Link>
+                }
+              >
+                Tracking starts after an administrator issues a connector key and you activate it
+                on this computer. You cannot add AI tools yourself.
+              </Callout>
+            </div>
           ) : null}
 
           {worstLive ? (

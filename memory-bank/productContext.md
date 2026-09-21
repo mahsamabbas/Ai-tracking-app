@@ -16,6 +16,10 @@ Developers must see the same data collected about them.
 Organisation → Employees → Employee → AI tool → Sessions → Session detail.
 Every screen exists to serve one step of it.
 
+**Connector control:** administrators issue a device ID + token per employee and AI
+tool. Developers only activate that key on their machine. They cannot register
+arbitrary tools.
+
 ## Non-goals
 
 No keystrokes/screenshots/full prompts. No developer ranking or productivity

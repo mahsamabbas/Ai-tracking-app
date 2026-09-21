@@ -3,6 +3,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  NotFoundException,
   Param,
   Post,
   Req,
@@ -26,6 +27,7 @@ import {
   canViewConnectorHealth,
   ensureEmployee,
   listPortalUsers,
+  listDeveloperDevices,
   DEV_ORG,
 } from "@techlio/server-core";
 import { eq } from "drizzle-orm";
@@ -57,7 +59,8 @@ export class ConnectorsController {
     @Body() body: { developerId?: string; publicKey?: string; provider?: string; label?: string },
   ) {
     const user = userFromRequest(req);
-    const developerId = body.developerId ?? user.developerId;
+    requireRoles(user, ["administrator"]);
+    const developerId = body.developerId;
     if (!developerId) {
       throw new UnauthorizedException("developer_id_required");
     }
@@ -83,8 +86,66 @@ export class ConnectorsController {
       provider,
       label:
         body.label?.trim() ||
-        (member ? `${member.displayName}'s ${provider}` : "Workstation connector"),
+        (member ? `${member.displayName} · ${provider}` : "Assigned connector"),
     });
+  }
+
+  @Post("activate")
+  @UseGuards(DashboardAuthGuard)
+  async activate(
+    @Req() req: FastifyRequest,
+    @Body() body: { deviceId?: string; token?: string },
+  ) {
+    const user = userFromRequest(req);
+    const deviceId = body.deviceId?.trim();
+    const token = body.token?.trim();
+    if (!deviceId || !token) {
+      throw new UnauthorizedException("device_id_and_token_required");
+    }
+    const verified = await verifyDeviceToken(deviceId, token);
+    if (!verified.ok || !verified.organizationId || !verified.developerId) {
+      throw new UnauthorizedException("invalid_connector_key");
+    }
+    if (verified.organizationId !== user.organizationId) {
+      throw new ForbiddenException("org_mismatch");
+    }
+    if (user.role === "developer" && user.developerId !== verified.developerId) {
+      throw new ForbiddenException("role_forbidden");
+    }
+    if (user.role !== "developer" && user.role !== "administrator") {
+      throw new ForbiddenException("role_forbidden");
+    }
+    const device = await getDevice(verified.organizationId, deviceId);
+    if (!device || device.revokedAt) {
+      throw new NotFoundException("device_not_found");
+    }
+    return {
+      deviceId: device.id,
+      developerId: device.developerId,
+      organizationId: device.organizationId,
+      provider: device.provider,
+      label: device.label,
+    };
+  }
+
+  @Get("mine")
+  @UseGuards(DashboardAuthGuard)
+  async mine(@Req() req: FastifyRequest) {
+    const user = userFromRequest(req);
+    const developerId = user.developerId;
+    if (!developerId) {
+      throw new UnauthorizedException("developer_id_required");
+    }
+    requireRoles(user, ["developer"]);
+    const rows = await listDeveloperDevices(user.organizationId, developerId);
+    return {
+      devices: rows.map((d) => ({
+        deviceId: d.id,
+        provider: d.provider,
+        label: d.label,
+        createdAt: d.createdAt,
+      })),
+    };
   }
 
   @Post(":id/revoke")
@@ -93,7 +154,10 @@ export class ConnectorsController {
     const user = userFromRequest(req);
     requireRoles(user, ["administrator"]);
     const ok = await revokeDevice(user.organizationId, id, user.id);
-    return { revoked: ok };
+    if (!ok) {
+      throw new NotFoundException("device_not_found");
+    }
+    return { revoked: true };
   }
 
   @Post(":id/heartbeat")
@@ -189,10 +253,23 @@ export class ConnectorsController {
       throw new ForbiddenException("role_forbidden");
     }
 
+    const device = await getDevice(user.organizationId, id);
+    if (!device) {
+      throw new NotFoundException("device_not_found");
+    }
+
     await db
-      .update(connectorHealth)
-      .set({ paused: paused ? 1 : 0 })
-      .where(eq(connectorHealth.deviceId, id));
+      .insert(connectorHealth)
+      .values({
+        deviceId: id,
+        organizationId: user.organizationId,
+        paused: paused ? 1 : 0,
+        provider: device.provider,
+      })
+      .onConflictDoUpdate({
+        target: connectorHealth.deviceId,
+        set: { paused: paused ? 1 : 0 },
+      });
 
     const gapEvent = {
       event_id: randomUUID(),

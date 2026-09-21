@@ -69,7 +69,7 @@ export default function ConnectorsPage() {
   async function revoke(deviceId: string) {
     setBusy(deviceId);
     try {
-      await apiPost(`/v1/connectors/${deviceId}/revoke`, token);
+      await apiPost<{ revoked?: boolean }>(`/v1/connectors/${deviceId}/revoke`, token, {});
       setNotice("Credential revoked. The connector can no longer upload events.");
       query.reload();
     } catch (err) {

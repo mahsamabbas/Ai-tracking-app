@@ -45,7 +45,7 @@ export const ROLE_SCOPE: Record<Role, string> = {
   administrator:
     "Manage users, connectors, and policy, plus full organisation analytics.",
   developer:
-    "See the metadata collected about you, and add the AI-tool connectors on your computers.",
+    "See the metadata collected about you, and activate connector keys your administrator assigned.",
   auditor:
     "Read-only access history, connector configuration, and retention. Not individual timelines.",
 };

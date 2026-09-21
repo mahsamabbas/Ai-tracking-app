@@ -2,17 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
 import { Callout } from "@/components/ui/Callout";
 
 export const CONNECTOR_LOCAL = "http://127.0.0.1:9477";
 
 export async function claimLocalConnector(input: {
   accessToken: string;
-  developerId: string;
+  deviceId: string;
+  deviceToken: string;
   displayName?: string;
-  provider?: string;
-  label?: string;
 }): Promise<{ ok: true } | { ok: false; offline: boolean; message: string }> {
   try {
     const r = await fetch(`${CONNECTOR_LOCAL}/claim`, {
@@ -20,10 +18,9 @@ export async function claimLocalConnector(input: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         accessToken: input.accessToken,
-        developerId: input.developerId,
+        deviceId: input.deviceId,
+        deviceToken: input.deviceToken,
         displayName: input.displayName,
-        provider: input.provider,
-        label: input.label,
         apiBaseUrl: API_BASE,
       }),
     });
@@ -32,7 +29,7 @@ export async function claimLocalConnector(input: {
       return {
         ok: false,
         offline: false,
-        message: json.error?.replace(/_/g, " ") ?? "Could not pair this computer",
+        message: json.error?.replace(/_/g, " ") ?? "Could not activate that key",
       };
     }
     return { ok: true };
@@ -98,15 +95,15 @@ export function ThisComputerStatus() {
   if (state.kind === "offline") {
     return (
       <Callout tone="warn" title="Connector not running on this computer">
-        Start it with pnpm dev, then add a connector from My connectors in your portal.
+        Start it with pnpm dev, then activate the admin-issued key on My connectors.
       </Callout>
     );
   }
 
   if (state.kind === "unpaired") {
     return (
-      <Callout tone="warn" title="This computer is not paired">
-        Open My connectors and add the AI tool you use on this Mac.
+      <Callout tone="warn" title="This computer is not using an assigned key">
+        Ask your administrator for a device ID and token, then enter them on My connectors.
       </Callout>
     );
   }
@@ -114,7 +111,7 @@ export function ThisComputerStatus() {
   return (
     <Callout
       tone="info"
-      title={`This computer is paired as ${state.displayName ?? "you"}`}
+      title={`This computer is using ${state.label ?? "your assigned connector"}`}
       action={
         <button
           type="button"
@@ -125,58 +122,9 @@ export function ThisComputerStatus() {
         </button>
       }
     >
-      Agent sessions on this Mac are attributed to you
-      {state.providers?.length ? ` · tools: ${state.providers.join(", ")}` : ""}. Unpair or add
-      another tool from My connectors.
+      Activity is attributed to {state.displayName ?? "you"}
+      {state.providers?.length ? ` · ${state.providers.join(", ")}` : ""}. Only an administrator
+      can issue another key.
     </Callout>
-  );
-}
-
-export function ConnectThisComputer({
-  developerId,
-  displayName,
-}: {
-  developerId: string;
-  displayName?: string;
-}) {
-  const { token } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<"ok" | "err" | null>(null);
-  const [detail, setDetail] = useState<string | null>(null);
-
-  async function connect() {
-    if (!token) return;
-    setBusy(true);
-    setResult(null);
-    setDetail(null);
-    const res = await claimLocalConnector({
-      accessToken: token,
-      developerId,
-      displayName,
-    });
-    setBusy(false);
-    if (res.ok) {
-      setResult("ok");
-      setDetail(`${displayName ?? "This person"} is now linked to Cursor on this computer.`);
-    } else {
-      setResult("err");
-      setDetail(res.message);
-    }
-  }
-
-  return (
-    <div className="flex flex-col items-start gap-1">
-      <button
-        type="button"
-        className="btn-ghost h-8 text-xs"
-        disabled={busy || !token}
-        onClick={() => void connect()}
-      >
-        {busy ? "Connecting…" : "Connect this computer"}
-      </button>
-      {detail ? (
-        <p className={result === "ok" ? "hint text-teal-700" : "hint text-rose-700"}>{detail}</p>
-      ) : null}
-    </div>
   );
 }

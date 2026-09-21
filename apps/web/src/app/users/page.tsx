@@ -7,11 +7,11 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
-import { ConnectThisComputer } from "@/components/domain/ConnectThisComputer";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiPost } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/permissions";
+import { providerLabel } from "@/lib/providers";
 import type { Role } from "@/lib/types";
 
 interface OrgUser {
@@ -31,6 +31,22 @@ const ROLE_TONE: Record<Role, "info" | "ok" | "neutral" | "warn"> = {
   auditor: "neutral",
 };
 
+const ASSIGNABLE_TOOLS = [
+  { id: "cursor", label: "Cursor" },
+  { id: "claude_code", label: "Claude Code" },
+  { id: "vscode", label: "VS Code companion" },
+  { id: "gemini", label: "Gemini CLI" },
+  { id: "codex", label: "Codex" },
+] as const;
+
+interface IssuedKey {
+  displayName: string;
+  developerId: string;
+  deviceId: string;
+  token: string;
+  provider: string;
+}
+
 export default function UsersPage() {
   const { token } = useAuth();
   const query = useApi<{ users: OrgUser[] }>("/v1/users");
@@ -40,43 +56,109 @@ export default function UsersPage() {
     password: "",
     role: "developer" as Role,
   });
+  const [issueFor, setIssueFor] = useState<OrgUser | null>(null);
+  const [issueTool, setIssueTool] = useState("cursor");
+  const [issued, setIssued] = useState<IssuedKey | null>(null);
+  const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<{ tone: "info" | "bad"; text: string } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setBusy("create");
     setNotice(null);
     try {
       const res = await apiPost<{ error?: string; user?: OrgUser }>("/v1/users", token, form);
       if (res.error) throw new Error(res.error.replace(/_/g, " "));
       const createdName = form.displayName;
       const role = form.role;
+      const created = res.user;
       setForm({ displayName: "", email: "", password: "", role: "developer" });
       setNotice({
         tone: "info",
         text:
           role === "developer"
-            ? `${createdName} can sign in. They add Cursor or another tool from My connectors in their portal.`
-            : `${createdName} can sign in. Only the Developer role is monitored; managers and admins use the dashboard without pairing a connector.`,
+            ? `${createdName} can sign in. Issue a connector key next — they cannot add tools themselves.`
+            : `${createdName} can sign in. Only developers are monitored.`,
       });
       query.reload();
+      if (created?.developerId && created.role === "developer") {
+        setIssueFor(created);
+        setIssueTool("cursor");
+      }
     } catch (err) {
       setNotice({
         tone: "bad",
         text: err instanceof Error ? err.message : "Could not create the user",
       });
     } finally {
-      setBusy(false);
+      setBusy(null);
+    }
+  }
+
+  async function issueKey() {
+    if (!issueFor?.developerId) return;
+    setBusy("issue");
+    setNotice(null);
+    setCopied(false);
+    try {
+      const res = await apiPost<{
+        error?: string;
+        deviceId?: string;
+        token?: string;
+      }>("/v1/connectors/register", token, {
+        developerId: issueFor.developerId,
+        provider: issueTool,
+        label: `${issueFor.displayName} · ${providerLabel(issueTool)}`,
+      });
+      if (!res.deviceId || !res.token) {
+        throw new Error(res.error?.replace(/_/g, " ") ?? "Could not issue key");
+      }
+      setIssued({
+        displayName: issueFor.displayName,
+        developerId: issueFor.developerId,
+        deviceId: res.deviceId,
+        token: res.token,
+        provider: issueTool,
+      });
+      setIssueFor(null);
+      setNotice({
+        tone: "info",
+        text: `Key issued for ${issueFor.displayName}. Copy it now — the token is shown once. Give it to them to enter on My connectors.`,
+      });
+      query.reload();
+    } catch (err) {
+      setNotice({
+        tone: "bad",
+        text: err instanceof Error ? err.message : "Could not issue the key",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function copyKeys() {
+    if (!issued) return;
+    const text = [
+      `Device ID: ${issued.deviceId}`,
+      `Connector token: ${issued.token}`,
+      `AI tool: ${providerLabel(issued.provider)}`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+    } catch {
+      setCopied(false);
     }
   }
 
   const users = query.data?.users ?? [];
+  const developers = users.filter((u) => u.developerId);
 
   return (
     <AppShell
       title="Access"
-      subtitle="Dashboard logins, roles, and pairing this computer to a monitored person"
+      subtitle="You create logins and issue connector keys. Employees only activate the keys you assign."
     >
       {notice ? (
         <div className="mb-5">
@@ -86,33 +168,105 @@ export default function UsersPage() {
 
       <section className="mb-5 grid gap-3 md:grid-cols-3">
         <div className="card-pad">
-          <p className="label">1. Dashboard login</p>
+          <p className="label">1. Create the employee</p>
           <p className="mt-1.5 text-sm text-ink-700">
-            A user account lets them open Techlio. It does not watch Cursor or any other tool.
+            A Developer login lets them see their own activity. It does not start tracking.
           </p>
         </div>
         <div className="card-pad">
-          <p className="label">2. Pair this computer</p>
+          <p className="label">2. You issue a connector key</p>
           <p className="mt-1.5 text-sm text-ink-700">
-            That person signs in and opens My connectors. They pick the AI tool and connect this
-            computer themselves — you do not paste env vars for them.
+            Assign which AI tool is allowed (Cursor, Claude Code, …). Copy the device ID and token
+            and send them privately.
           </p>
         </div>
         <div className="card-pad">
-          <p className="label">3. IDE companion</p>
+          <p className="label">3. They activate that key</p>
           <p className="mt-1.5 text-sm text-ink-700">
-            Install the Techlio companion in Cursor or VS Code on that machine. Activity follows
-            the paired person, not a .env file.
+            On their computer they paste the keys into My connectors. They cannot invent extra
+            tools or credentials.
           </p>
         </div>
       </section>
 
+      {issued ? (
+        <div className="mb-5">
+          <Card>
+            <CardHeader
+              title={`Assigned key for ${issued.displayName}`}
+              subtitle={`${providerLabel(issued.provider)} · token is shown once`}
+              action={
+                <button type="button" className="btn-ghost h-8 text-xs" onClick={() => void copyKeys()}>
+                  {copied ? "Copied" : "Copy keys"}
+                </button>
+              }
+            />
+            <CardBody>
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt className="label">Device ID</dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-ink-900">{issued.deviceId}</dd>
+                </div>
+                <div>
+                  <dt className="label">Connector token</dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-ink-900">{issued.token}</dd>
+                </div>
+              </dl>
+              <p className="hint mt-4">
+                Give these to {issued.displayName}. They sign in → My connectors → paste Device ID
+                and token → Activate on this computer. Issue another key if they need a second
+                tool or machine.
+              </p>
+            </CardBody>
+          </Card>
+        </div>
+      ) : null}
+
+      {issueFor?.developerId ? (
+        <div className="mb-5">
+          <Card>
+            <CardHeader
+              title={`Issue connector key for ${issueFor.displayName}`}
+              subtitle="Choose the AI tool this credential is for"
+              action={
+                <button type="button" className="btn-quiet h-8 text-xs" onClick={() => setIssueFor(null)}>
+                  Cancel
+                </button>
+              }
+            />
+            <CardBody>
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="block min-w-[200px] flex-1">
+                  <span className="label mb-1 block">AI tool</span>
+                  <select
+                    className="field"
+                    value={issueTool}
+                    onChange={(e) => setIssueTool(e.target.value)}
+                  >
+                    {ASSIGNABLE_TOOLS.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={busy === "issue"}
+                  onClick={() => void issueKey()}
+                >
+                  {busy === "issue" ? "Issuing…" : "Issue key"}
+                </button>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-3">
         <Card>
-          <CardHeader
-            title="Add a user"
-            subtitle="Developer = login. Pairing on their computer starts monitoring."
-          />
+          <CardHeader title="Add a user" subtitle="Developers are monitored; other roles are not." />
           <CardBody>
             <form className="space-y-3" onSubmit={onCreate}>
               <label className="block">
@@ -158,15 +312,20 @@ export default function UsersPage() {
                   ))}
                 </select>
               </label>
-              <button type="submit" className="btn-primary w-full" disabled={busy}>
-                {busy ? "Creating…" : "Create user"}
+              <button type="submit" className="btn-primary w-full" disabled={busy === "create"}>
+                {busy === "create" ? "Creating…" : "Create user"}
               </button>
             </form>
           </CardBody>
         </Card>
 
         <Card className="xl:col-span-2">
-          <CardHeader title="Members" subtitle={`${users.length} in this organisation`} />
+          <CardHeader
+            title="Members"
+            subtitle={`${users.length} in this organisation · ${developers.length} monitored`}
+            href="/connectors"
+            hrefLabel="Connector health"
+          />
           {query.error ? (
             <ErrorState
               title="Could not load members"
@@ -189,39 +348,53 @@ export default function UsersPage() {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
-                    <th>This computer</th>
-                    <th>Activity</th>
+                    <th>Connector key</th>
+                    <th className="text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((u) => (
                     <tr key={u.id}>
-                      <td className="text-sm font-medium text-ink-900">{u.displayName}</td>
-                      <td className="text-sm text-ink-500">{u.email}</td>
-                      <td>
+                      <td className="min-w-[120px] text-sm font-medium text-ink-900">
+                        {u.displayName}
+                      </td>
+                      <td className="min-w-[160px] text-sm text-ink-500">{u.email}</td>
+                      <td className="whitespace-nowrap">
                         <Badge tone={ROLE_TONE[u.role]}>{ROLE_LABEL[u.role]}</Badge>
                       </td>
-                      <td>
-                        {u.developerId ? (
-                          <ConnectThisComputer
-                            developerId={u.developerId}
-                            displayName={u.displayName}
-                          />
-                        ) : (
+                      <td className="min-w-[140px]">
+                        {!u.developerId ? (
                           <span className="hint">Not monitored</span>
+                        ) : u.hasConnector ? (
+                          <Badge tone="ok">Key issued</Badge>
+                        ) : (
+                          <Badge tone="warn">No key yet</Badge>
                         )}
                       </td>
-                      <td>
-                        {u.developerId ? (
-                          <Link
-                            href={`/employees/${u.developerId}`}
-                            className="text-xs font-medium text-brand-600 hover:text-brand-700"
-                          >
-                            View analytics →
-                          </Link>
-                        ) : (
-                          <span className="hint">—</span>
-                        )}
+                      <td className="whitespace-nowrap text-right">
+                        <div className="flex justify-end gap-2">
+                          {u.developerId ? (
+                            <button
+                              type="button"
+                              className="btn-ghost h-8 text-xs"
+                              onClick={() => {
+                                setIssueFor(u);
+                                setIssueTool("cursor");
+                                setIssued(null);
+                              }}
+                            >
+                              {u.hasConnector ? "Issue another key" : "Issue key"}
+                            </button>
+                          ) : null}
+                          {u.developerId ? (
+                            <Link
+                              href={`/employees/${u.developerId}`}
+                              className="inline-flex h-8 items-center text-xs font-medium text-brand-600 hover:text-brand-700"
+                            >
+                              Analytics →
+                            </Link>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}

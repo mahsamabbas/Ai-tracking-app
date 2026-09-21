@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
-import { AddConnectorForm } from "@/components/domain/AddConnectorForm";
+import { ActivateConnectorForm } from "@/components/domain/AddConnectorForm";
 import { ThisComputerStatus } from "@/components/domain/ConnectThisComputer";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
@@ -14,18 +15,21 @@ import { apiPost } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import { homePathForRole } from "@/lib/permissions";
 import type { LiveStatus } from "@/lib/types";
-import { useState } from "react";
 
 export default function MyConnectorsPage() {
   const { token, user } = useAuth();
-  const query = useApi<LiveStatus>("/v1/dashboard/live?limit=1", { pollMs: 15_000 });
+  const live = useApi<LiveStatus>("/v1/dashboard/live?limit=1", { pollMs: 15_000 });
+  const assigned = useApi<{
+    devices: { deviceId: string; provider: string | null; label: string | null }[];
+  }>(user?.role === "developer" ? "/v1/connectors/mine" : null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const developerId = user?.developerId;
-  const mine = (query.data?.connectors ?? []).filter(
+  const mine = (live.data?.connectors ?? []).filter(
     (c) => !developerId || c.developerId === developerId,
   );
+  const assignedKeys = assigned.data?.devices ?? [];
 
   async function toggle(deviceId: string, paused: boolean) {
     setBusy(deviceId);
@@ -33,7 +37,7 @@ export default function MyConnectorsPage() {
     try {
       await apiPost(`/v1/connectors/${deviceId}/${paused ? "resume" : "pause"}`, token);
       setNotice(paused ? "Collection resumed." : "Collection paused. A coverage gap was recorded.");
-      query.reload();
+      live.reload();
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Could not update the connector");
     } finally {
@@ -46,15 +50,15 @@ export default function MyConnectorsPage() {
       <AppShell title="My connectors">
         <Callout
           tone="info"
-          title="Connector setup for developers"
+          title="Connector keys are issued on Access"
           action={
-            <Link href="/connectors" className="btn-ghost h-8 text-xs">
-              Org connectors →
+            <Link href="/users" className="btn-ghost h-8 text-xs">
+              Access →
             </Link>
           }
         >
-          Administrators manage organisation connector health. Developers add their own tools after
-          they sign in.
+          Administrators assign device IDs and tokens to each employee. Employees only activate
+          those keys.
         </Callout>
       </AppShell>
     );
@@ -63,7 +67,7 @@ export default function MyConnectorsPage() {
   return (
     <AppShell
       title="My connectors"
-      subtitle="Add the AI tools on this computer. Activity is attributed to you, not to a shared env file."
+      subtitle="Activate the connector key your administrator assigned. You cannot add tools they did not issue."
     >
       {notice ? (
         <div className="mb-5">
@@ -78,43 +82,49 @@ export default function MyConnectorsPage() {
       <div className="grid gap-4 xl:grid-cols-3">
         <Card>
           <CardHeader
-            title="Add a connector"
-            subtitle="Name it, pick the AI tool, and connect this computer"
+            title="Activate assigned key"
+            subtitle="Paste the device ID and token from your administrator"
           />
           <CardBody>
             {developerId ? (
-              <AddConnectorForm
-                developerId={developerId}
+              <ActivateConnectorForm
                 displayName={user?.displayName}
-                onAdded={() => query.reload()}
+                onActivated={() => {
+                  live.reload();
+                  assigned.reload();
+                }}
               />
             ) : (
               <p className="hint">This login is not a monitored developer account.</p>
             )}
-            <p className="hint mt-4">
-              To add a tool on another computer, sign in there and use this same screen. Each
-              machine is paired separately.
-            </p>
           </CardBody>
         </Card>
 
         <Card className="xl:col-span-2">
           <CardHeader
-            title="Your connectors"
-            subtitle={mine.length ? `${mine.length} on record` : "None yet"}
+            title="Keys assigned to you"
+            subtitle={
+              assignedKeys.length
+                ? `${assignedKeys.length} issued by your administrator`
+                : "None yet — ask admin to issue a key on Access"
+            }
             href={developerId ? `/employees/${developerId}` : homePathForRole("developer")}
             hrefLabel="My activity"
           />
-          {query.error ? (
-            <ErrorState title="Could not load connectors" detail={query.error} onRetry={query.reload} />
-          ) : query.loading ? (
-            <LoadingBlock rows={5} />
-          ) : mine.length === 0 ? (
+          {assigned.error ? (
+            <ErrorState title="Could not load assigned keys" detail={assigned.error} onRetry={assigned.reload} />
+          ) : assigned.loading ? (
+            <LoadingBlock rows={4} />
+          ) : assignedKeys.length === 0 ? (
             <EmptyState
               variant="connector-offline"
-              title="No connector yet"
-              body="Use the form to add Cursor, Claude Code, or another tool on this computer. Signing in does not collect activity by itself."
+              title="No key assigned"
+              body="Your administrator must issue a connector key for a specific AI tool. You cannot create one here."
             />
+          ) : live.error ? (
+            <ErrorState title="Could not load connector health" detail={live.error} onRetry={live.reload} />
+          ) : live.loading ? (
+            <LoadingBlock rows={5} />
           ) : (
             <div className="overflow-x-auto">
               <table className="tbl">
@@ -128,31 +138,42 @@ export default function MyConnectorsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mine.map((c) => (
-                    <tr key={c.deviceId}>
-                      <td className="text-sm font-medium text-ink-900">
-                        {c.displayName}
-                        <span className="hint block">{c.deviceId.slice(0, 8)}</span>
-                      </td>
-                      <td>
-                        <ProviderBadge provider={c.provider} size="sm" />
-                      </td>
-                      <td>
-                        <ConnectorBadge state={c.state} demo={c.isDemo} />
-                      </td>
-                      <td className="num text-sm text-ink-500">{formatRelative(c.lastHeartbeat)}</td>
-                      <td className="text-right">
-                        <button
-                          type="button"
-                          className="btn-ghost h-8 text-xs"
-                          disabled={busy === c.deviceId}
-                          onClick={() => void toggle(c.deviceId, c.paused)}
-                        >
-                          {c.paused ? "Resume" : "Pause"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {assignedKeys.map((k) => {
+                    const liveRow = mine.find((c) => c.deviceId === k.deviceId);
+                    return (
+                      <tr key={k.deviceId}>
+                        <td className="text-sm font-medium text-ink-900">
+                          {k.label ?? "Assigned connector"}
+                          <span className="hint block font-mono">{k.deviceId.slice(0, 8)}…</span>
+                        </td>
+                        <td>
+                          <ProviderBadge provider={k.provider} size="sm" />
+                        </td>
+                        <td>
+                          {liveRow ? (
+                            <ConnectorBadge state={liveRow.state} demo={liveRow.isDemo} />
+                          ) : (
+                            <span className="hint">Not activated on this computer</span>
+                          )}
+                        </td>
+                        <td className="num text-sm text-ink-500">
+                          {liveRow ? formatRelative(liveRow.lastHeartbeat) : "—"}
+                        </td>
+                        <td className="text-right">
+                          {liveRow ? (
+                            <button
+                              type="button"
+                              className="btn-ghost h-8 text-xs"
+                              disabled={busy === k.deviceId}
+                              onClick={() => void toggle(k.deviceId, liveRow.paused)}
+                            >
+                              {liveRow.paused ? "Resume" : "Pause"}
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
