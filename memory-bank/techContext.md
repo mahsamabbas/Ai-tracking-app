@@ -10,7 +10,8 @@
   `schema_migrations`.
 - **Demo data:** `packages/server-core/src/seed.ts`, deterministic, run with
   `pnpm db:seed`.
-- **Tier A** (full session/model/tool telemetry through the local connector):
-  Cursor, Claude Code, Codex, Gemini
+- **Tier A implemented:** Claude Code hooks. Codex and Gemini are planned adapters
+  only; their OTLP routes reject with 501 until normalization exists.
 - **Tier B** (daily aggregates only): Cursor Admin API, GitHub Copilot reports.
-  The VS Code companion contributes file and task-context signals only.
+  Cursor/VS Code companions contribute file and task-context signals only; they
+  do not expose the host agent's internal model/tool stream.

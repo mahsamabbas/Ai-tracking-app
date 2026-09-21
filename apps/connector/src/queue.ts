@@ -4,6 +4,11 @@ import type { ActivityEvent } from "@techlio/event-schema";
 
 const ALGO = "aes-256-gcm";
 
+export type PendingBatch = {
+  rowIds: number[];
+  events: ActivityEvent[];
+};
+
 function deriveKey(secret: string): Buffer {
   return scryptSync(secret, "techlio-connector", 32);
 }
@@ -51,24 +56,42 @@ export class EncryptedQueue {
     stmt.run(blob, new Date().toISOString());
   }
 
-  dequeueBatch(limit = 100): ActivityEvent[] {
+  peekBatch(limit = 100): PendingBatch {
     const rows = this.db
       .prepare(
         "SELECT id, payload FROM pending ORDER BY id ASC LIMIT ?",
       )
       .all(limit) as { id: number; payload: Buffer }[];
     const events: ActivityEvent[] = [];
+    const rowIds: number[] = [];
     const del = this.db.prepare("DELETE FROM pending WHERE id = ?");
     for (const row of rows) {
       try {
         const parsed = JSON.parse(this.decrypt(row.payload)) as ActivityEvent[];
         events.push(...parsed);
+        rowIds.push(row.id);
       } catch {
-        /* old key or corrupt row */
+        // An unreadable row can never be delivered and must not block newer rows.
+        del.run(row.id);
       }
-      del.run(row.id);
     }
-    return events;
+    return { rowIds, events };
+  }
+
+  acknowledge(rowIds: number[]): void {
+    if (rowIds.length === 0) return;
+    const del = this.db.prepare("DELETE FROM pending WHERE id = ?");
+    const remove = this.db.transaction((ids: number[]) => {
+      for (const id of ids) del.run(id);
+    });
+    remove(rowIds);
+  }
+
+  /** Compatibility helper. Prefer peekBatch + acknowledge for uploads. */
+  dequeueBatch(limit = 100): ActivityEvent[] {
+    const batch = this.peekBatch(limit);
+    this.acknowledge(batch.rowIds);
+    return batch.events;
   }
 
   depth(): number {

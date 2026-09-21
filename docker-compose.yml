@@ -8,6 +8,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      - postgres_data:/var/lib/postgresql/data
       - ./infra/sql/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
       - ./infra/sql/002_devices_projects_sessions.sql:/docker-entrypoint-initdb.d/002_devices_projects_sessions.sql
       - ./infra/sql/003_connector_provider.sql:/docker-entrypoint-initdb.d/003_connector_provider.sql
@@ -15,8 +16,11 @@ services:
 
   redis:
     image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
 
   api:
     build:
@@ -52,3 +56,7 @@ services:
       - "3000:3000"
     depends_on:
       - api
+
+volumes:
+  postgres_data:
+  redis_data:

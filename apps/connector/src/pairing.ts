@@ -8,8 +8,11 @@ export async function claimFromPortal(input: {
   accessToken: string;
   deviceId: string;
   deviceToken: string;
+  publicKey: string;
   displayName?: string;
   apiBaseUrl?: string;
+  consentAccepted: boolean;
+  consentVersion: string;
 }): Promise<ConnectorIdentity> {
   const api = (input.apiBaseUrl ?? "http://localhost:3001").replace(/\/$/, "");
   const meRes = await fetch(`${api}/v1/auth/me`, {
@@ -39,6 +42,9 @@ export async function claimFromPortal(input: {
     body: JSON.stringify({
       deviceId: input.deviceId,
       token: input.deviceToken,
+      publicKey: input.publicKey,
+      consentAccepted: input.consentAccepted,
+      consentVersion: input.consentVersion,
     }),
   });
   if (act.status === 401) throw new Error("invalid_connector_key");

@@ -1,7 +1,82 @@
 # Pending work vs PRD v0.2
 
 Source: [requirements.md](requirements.md).  
-Last reviewed: 2026-09-18 (monitoring-product refactor).
+Last reviewed: 2026-09-21 (delivery-phase audit and integrity pass).
+
+---
+
+## Current prioritized pending list
+
+### P0 — blocks pilot or production approval
+
+- [ ] Obtain Legal/HR approval for the monitoring notice, consent, retention,
+  access, pause, dispute, client-confidentiality, jurisdiction, and cross-border
+  policy (SEC-007/010).
+- [ ] Run and document one real sanitized Claude Code validation session,
+  including hooks/OTel, model/tool/test/file/token coverage, licensing, and
+  supported operating systems (Phase 0).
+- [ ] Add live integration tests for offline queue recovery, heartbeat stop,
+  pause/resume, late-event recalculation, invalid signatures, replay through the
+  API, and provider-missing UI behavior (§19).
+- [ ] Add production TLS and managed encryption at rest for Postgres, Redis,
+  backups, and exports (SEC-003).
+- [ ] Implement production SSO/OIDC and remove development authentication
+  fallbacks (FR-001).
+
+### P1 — complete the MVP product behavior
+
+- [ ] Decide whether direct Postgres ingestion is the accepted durability
+  boundary; otherwise add a durable server-side ingestion queue.
+- [ ] Persist connector-reported capabilities and use them in health/coverage
+  views instead of relying only on the static provider catalog (FR-012).
+- [ ] Emit and surface repeated `upload_failed` / `upload_recovered` and
+  `update_required` events and alerts.
+- [ ] Add per-developer current-hour event count/current context to the team
+  overview (FR-020).
+- [ ] Wire `/v1/developers/:id/timeline` into an employee-day hourly-card UI
+  (FR-022).
+- [ ] Add work-item, coverage-state, event-type, and clock-hour filters where
+  required (FR-026).
+- [ ] Add manager export controls and generate an actual PDF rather than the
+  current text stand-in (FR-028).
+- [ ] Complete notification rules for repeated upload failure, unsupported
+  versions, prolonged unassigned activity, and summary failure; add approved
+  email/Slack delivery if required (FR-027).
+- [ ] Decide FR-024 generated-summary scope. If enabled, add the database model,
+  evidence links, model metadata, versioned corrections, and failure handling.
+- [ ] Make hourly completeness include every relevant stale/offline/upload gap
+  and expose late delivery (`received_at` versus `occurred_at`) explicitly.
+- [ ] Apply configured organization timezone consistently to hourly labels.
+- [ ] Run the seven-day internal pilot and complete
+  `docs/pilot-report-template.md`.
+
+### P2 — production hardening
+
+- [ ] Add approved, time-limited, audited support-access workflow (SEC-004).
+- [ ] Enforce append-only audit records at the database-role/permission level
+  while retaining an approved expiry mechanism (SEC-006/008).
+- [ ] Implement 365-day retention jobs for hourly snapshots and audit records
+  after legal approval (SEC-008).
+- [ ] Add request IDs and idempotency keys to all write APIs where required.
+- [ ] Add operational metrics for event lag, queue depth, rejected events,
+  connector versions, stale heartbeats, hourly job duration, summary failures,
+  and API errors (NFR-005).
+- [ ] Run the 50-developer load test and record dashboard/API p95 results
+  (NFR-003).
+- [ ] Define and monitor the 99.5% pilot availability SLO (NFR-004).
+- [ ] Add automated accessibility checks and complete a WCAG 2.1 AA review
+  (NFR-007).
+- [ ] Add production infrastructure-as-code, environment separation, secret
+  management, and deployment/rollback automation (NFR-008).
+- [ ] Execute and record backup/restore, rollback, incident-response, and
+  disaster-recovery drills using `docs/ops/runbook.md`.
+- [ ] Package and sign macOS/Windows connectors and move local credentials to
+  the OS keychain.
+- [ ] Complete the remaining ADRs for identity, privacy, storage,
+  sessionization, hourly aggregation, and live updates.
+- [ ] Implement Codex/Gemini adapters only after Claude Code passes the real
+  pilot; configure Cursor/Copilot Tier B pullers only with approved Enterprise
+  credentials.
 
 ---
 
@@ -34,16 +109,16 @@ Last reviewed: 2026-09-18 (monitoring-product refactor).
 | ID | Status |
 |----|--------|
 | FR-001 | **Partial** — JWT portals; production SSO/OIDC still pending |
-| FR-006 | **Partial** — Claude hooks; Codex/Gemini OTLP adapters pending |
-| FR-007 | **Partial** — register/revoke + hash; API Ed25519 verify not enforced |
+| FR-006 | **Partial** — Claude hooks; Cursor companion/daily only; Codex/Gemini adapters pending |
+| FR-007 | **Done locally** — register/revoke, token hash, activation key binding, API Ed25519 verification |
 | FR-024 | **Deferred** — UI explains deterministic metrics only |
 | FR-027 | **Partial** — in-app health notifications; no email/Slack delivery |
 | FR-028 | **Partial** — CSV + text export (not full PDF layout) |
 
-FR-020/021/022/025/026 are **done**: the employee directory, 30s live polling,
-hourly cards, the full Organisation → Employees → Employee → AI tool → Sessions →
-Session → source-events drill-down, and date/team/tool/activity/project/connector
-filters on every relevant screen.
+FR-021 and the session drill-down core of FR-025 are done. FR-020/022/026 remain
+**partial**: the team view lacks a per-developer current-hour event count, the
+hourly-card day timeline API is not wired into the web UI, and work-item,
+coverage-state, and clock-hour filters are missing.
 
 FR-002/003/004/005 are implemented for the local prototype (RBAC on routes, org-scoped queries, developer self-view, pause → coverage gap).
 
@@ -56,7 +131,7 @@ FR-002/003/004/005 are implemented for the local prototype (RBAC on routes, org-
 - SEC-006 append-only audit **DB role** enforcement
 - NFR-003–005 load/SLO/OTel metrics
 - NFR-007 WCAG 2.1 AA audit
-- NFR-008 Terraform, runbooks, backup/restore drills
+- NFR-008 Terraform and executed backup/restore/rollback/incident drills
 
 ---
 
@@ -66,6 +141,10 @@ Automated: interval overlap merge, idle exclusion from the interactive span,
 session classification, null (not zero) token totals, coverage-gap detection,
 date-range resolution, secrets, unassigned, provider-missing, timesheet reject,
 unauthorized developer view, auditor denied timeline, secret scan.
+
+Also automated: encrypted queue peek/ack semantics, exact-body Ed25519
+verification with tamper rejection, and in-process duplicate-event replay
+rejection.
 
 Still need **live integration**: offline connector, long idle, late event E2E, heartbeat stop, pause E2E, replay against API, provider-missing full UI.
 
@@ -81,4 +160,6 @@ Still need **live integration**: offline connector, long idle, late event E2E, h
 
 ## Deliverables
 
-- Remaining ADRs, full ops docs, pilot report
+- Remaining ADRs and executed ops/DR evidence
+- `docs/ops/runbook.md` is the local baseline; production drills are not done.
+- `docs/pilot-report-template.md` exists; the seven-day pilot has not started.

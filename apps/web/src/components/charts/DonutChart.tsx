@@ -3,6 +3,7 @@
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { ChartFrame, TooltipShell } from "./ChartFrame";
 import { CHART_COLORS } from "@/lib/vocab";
+import type { EmptyVariant } from "@/components/ui/States";
 
 export interface Slice {
   name: string;
@@ -24,7 +25,7 @@ export function DonutChart({
   centerLabel?: string;
   centerValue?: string;
   emptyBody?: string;
-  emptyVariant?: "no-activity" | "no-results" | "provider-missing" | "connector-offline";
+  emptyVariant?: EmptyVariant;
 }) {
   const total = data.reduce((s, d) => s + d.value, 0);
   return (

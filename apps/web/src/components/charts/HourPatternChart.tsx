@@ -4,6 +4,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from "recha
 import { AXIS, ChartFrame, GRID, TooltipShell, durationTicks } from "./ChartFrame";
 import { formatDuration } from "@/lib/format";
 import type { HourPattern } from "@/lib/types";
+import type { EmptyVariant } from "@/components/ui/States";
 
 /** Working-hour pattern — when agent activity actually happens, org timezone. */
 export function HourPatternChart({
@@ -13,7 +14,7 @@ export function HourPatternChart({
 }: {
   data: HourPattern[];
   height?: number;
-  emptyVariant?: "no-activity" | "connector-offline";
+  emptyVariant?: EmptyVariant;
 }) {
   const max = Math.max(...data.map((d) => d.activeMs), 0);
   return (

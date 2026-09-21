@@ -11,6 +11,7 @@ import {
 import { AXIS, ChartFrame, GRID, TooltipShell, durationTicks } from "./ChartFrame";
 import { formatDate, formatDuration } from "@/lib/format";
 import type { TrendPoint } from "@/lib/types";
+import type { EmptyVariant } from "@/components/ui/States";
 
 /** Daily active vs idle time. Two bands so they are never read as one number. */
 export function TrendChart({
@@ -20,8 +21,7 @@ export function TrendChart({
 }: {
   data: TrendPoint[];
   height?: number;
-  /** "No activity observed" and "connector offline" are not interchangeable. */
-  emptyVariant?: "no-activity" | "connector-offline";
+  emptyVariant?: EmptyVariant;
 }) {
   const isEmpty = data.every((d) => d.activeMs === 0 && d.idleMs === 0);
   const maxMs = Math.max(...data.map((d) => Math.max(d.activeMs, d.idleMs)), 0);

@@ -32,6 +32,13 @@ export async function signBody(
   return Buffer.from(sig).toString("base64");
 }
 
+export async function publicSigningKey(
+  privateKey: Uint8Array,
+): Promise<string> {
+  const key = await ed.getPublicKeyAsync(privateKey);
+  return Buffer.from(key).toString("base64");
+}
+
 export function newDeviceToken(): string {
   return randomBytes(32).toString("hex");
 }

@@ -60,8 +60,10 @@ Each response echoes the resolved `range` and `preset`, and comparison figures
 
 | Method | Path | Notes |
 |--------|------|-------|
-| POST | `/v1/events/batch` | Signed batch. Idempotent on `event_id`; rejects replays, org/device mismatches, and payloads containing secrets |
-| POST | `/v1/connectors/register` | Issues a revocable device credential |
+| POST | `/v1/events/batch` | Requires `Authorization: Bearer <device-token>`, `X-Device-Id`, and Ed25519 `X-Signature` over the exact JSON body. Idempotent on `event_id`; rejects invalid signatures, replays, org/device mismatches, and secrets |
+| POST | `/v1/connectors/register` | Administrator issues a revocable device credential |
+| POST | `/v1/connectors/activate` | Developer activates an assigned credential, accepts the collection notice, and binds the installation's Ed25519 public key |
+| GET | `/v1/connectors/mine` | Developer lists assigned connector credentials (tokens are never returned) |
 | POST | `/v1/connectors/{id}/heartbeat` | Health, version, queue depth, pause state |
 | POST | `/v1/connectors/{id}/pause` \| `/resume` | Records an authorised pause and emits a coverage-gap event |
 | POST | `/v1/connectors/{id}/revoke` | Administrator only |

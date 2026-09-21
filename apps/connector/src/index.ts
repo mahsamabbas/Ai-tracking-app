@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import {
@@ -13,12 +14,11 @@ import {
   clearIdentity,
   loadIdentity,
   publicIdentity,
-  saveIdentity,
   type ConnectorIdentity,
 } from "./identity.js";
 import { claimFromPortal } from "./pairing.js";
 import { EncryptedQueue } from "./queue.js";
-import { loadOrCreateSigningKey } from "./signing.js";
+import { loadOrCreateSigningKey, publicSigningKey } from "./signing.js";
 import { sanitizeEvent } from "./redaction.js";
 import { uploadBatch } from "./uploader.js";
 
@@ -28,6 +28,7 @@ let hostProvider = config.provider;
 let activeSessionId: string | undefined;
 let contextLabel: string | undefined;
 let identity: ConnectorIdentity | null = loadIdentity();
+let flushing = false;
 
 function defaultStatus(
   eventType: ActivityEvent["event_type"],
@@ -101,9 +102,11 @@ function baseEvent(
 }
 
 async function flushQueue(): Promise<void> {
-  if (paused || !identity) return;
-  const batch = queue.dequeueBatch().map(stamp);
+  if (paused || !identity || flushing) return;
+  const pending = queue.peekBatch();
+  const batch = pending.events.map(stamp);
   if (batch.length === 0) return;
+  flushing = true;
   try {
     const ok = await uploadBatch(
       apiBase(),
@@ -111,9 +114,11 @@ async function flushQueue(): Promise<void> {
       signingKey,
       batch,
     );
-    if (!ok) queue.enqueue(batch);
+    if (ok) queue.acknowledge(pending.rowIds);
   } catch {
-    queue.enqueue(batch);
+    // Keep the original queue rows for at-least-once delivery.
+  } finally {
+    flushing = false;
   }
 }
 
@@ -208,6 +213,7 @@ app.post("/claim", async (req, reply) => {
     deviceToken?: string;
     displayName?: string;
     apiBaseUrl?: string;
+    consentAccepted?: boolean;
   };
   if (!body.accessToken) {
     return reply.code(400).send({ error: "access_token_required" });
@@ -215,13 +221,19 @@ app.post("/claim", async (req, reply) => {
   if (!body.deviceId || !body.deviceToken) {
     return reply.code(400).send({ error: "admin_issued_keys_required" });
   }
+  if (body.consentAccepted !== true) {
+    return reply.code(400).send({ error: "collection_notice_required" });
+  }
   try {
     identity = await claimFromPortal({
       accessToken: body.accessToken,
       deviceId: body.deviceId,
       deviceToken: body.deviceToken,
+      publicKey: await publicSigningKey(signingKey),
       displayName: body.displayName,
       apiBaseUrl: body.apiBaseUrl ?? config.apiBaseUrl,
+      consentAccepted: true,
+      consentVersion: config.consentVersion,
     });
     queue.clear();
     if (identity.provider) hostProvider = identity.provider;
@@ -383,8 +395,18 @@ app.post("/hooks/claude", async (req) => {
   return { accepted: clean.length };
 });
 
-app.post("/v1/traces", async () => ({ partialSuccess: {} }));
-app.post("/v1/logs", async () => ({ partialSuccess: {} }));
+const rejectUnavailableOtlp = async (
+  _request: FastifyRequest,
+  reply: FastifyReply,
+) =>
+  reply.code(501).send({
+    error: "otlp_adapter_not_enabled",
+    message:
+      "This connector build does not normalize OTLP payloads. No telemetry was accepted.",
+  });
+
+app.post("/v1/traces", rejectUnavailableOtlp);
+app.post("/v1/logs", rejectUnavailableOtlp);
 
 setInterval(() => {
   void flushQueue();

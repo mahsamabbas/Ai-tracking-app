@@ -6,7 +6,15 @@ import {
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, lt } from "drizzle-orm";
 import { db } from "./db.js";
-import { activityEvents, hourlySnapshots } from "./schema.js";
+import { activityEvents, employees, hourlySnapshots } from "./schema.js";
+
+const COVERAGE_EVENT_TYPES = new Set([
+  "connector_paused",
+  "telemetry_gap_started",
+  "upload_failed",
+  "update_required",
+  "provider_capability_missing",
+]);
 
 function hourStartUtc(d: Date): Date {
   return new Date(
@@ -29,6 +37,20 @@ export async function finalizeHourForDeveloper(
   const hourStart = hourStartUtc(hour);
   const hourEnd = new Date(hourStart.getTime() + 3600_000);
 
+  const existing = await db
+    .select({ id: hourlySnapshots.id })
+    .from(hourlySnapshots)
+    .where(
+      and(
+        eq(hourlySnapshots.organizationId, organizationId),
+        eq(hourlySnapshots.developerId, developerId),
+        eq(hourlySnapshots.hourStart, hourStart),
+        eq(hourlySnapshots.version, version),
+      ),
+    )
+    .limit(1);
+  if (existing[0]) return existing[0].id;
+
   const rows = await db
     .select()
     .from(activityEvents)
@@ -50,9 +72,15 @@ export async function finalizeHourForDeveloper(
   let testsCompleted = 0;
   let buildsCompleted = 0;
   let fileChanges = 0;
+  const coverageGapEventIds: string[] = [];
+  const coverageGapTypes = new Set<string>();
 
   for (const row of rows) {
     eventIds.push(row.eventId);
+    if (COVERAGE_EVENT_TYPES.has(row.eventType)) {
+      coverageGapEventIds.push(row.eventId);
+      coverageGapTypes.add(row.eventType);
+    }
     const p = row.payload as {
       event_type?: string;
       occurred_at?: string;
@@ -108,6 +136,8 @@ export async function finalizeHourForDeveloper(
     fileChanges,
     eventIds,
     eventCount: rows.length,
+    coverageGapEventIds,
+    coverageGapTypes: [...coverageGapTypes],
   };
 
   const snapshotId = randomUUID();
@@ -118,10 +148,26 @@ export async function finalizeHourForDeveloper(
     hourStart,
     version,
     metrics,
-    completeness: rows.length === 0 ? "partial" : "complete",
+    completeness:
+      rows.length === 0 || coverageGapEventIds.length > 0
+        ? "partial"
+        : "complete",
     recalcReason: recalcReason ?? null,
     createdAt: new Date(),
   });
 
   return snapshotId;
+}
+
+export async function listHourlyTargets(): Promise<
+  { organizationId: string; developerId: string }[]
+> {
+  const rows = await db
+    .select({
+      organizationId: employees.organizationId,
+      developerId: employees.id,
+    })
+    .from(employees)
+    .where(eq(employees.status, "active"));
+  return rows;
 }

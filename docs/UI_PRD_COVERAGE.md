@@ -17,8 +17,8 @@ is satisfied in the shipped product.
 
 | ID | Where |
 |----|-------|
-| FR-006 Supported provider | `PROVIDER_CAPABILITIES` in `@techlio/event-schema`; Cursor and Claude Code are Tier A through the local connector, Copilot and the VS Code companion are partial |
-| FR-007 Device registration | `POST /v1/connectors/register`, revocable from `/connectors` |
+| FR-006 Supported provider | Claude Code hooks are Tier A. Cursor/VS Code companions expose file/task signals, Cursor/Copilot APIs are daily Tier B, and Codex/Gemini adapters remain planned |
+| FR-007 Device registration | Admin-issued credential, notice acknowledgement, one-time Ed25519 key binding, signed batch verification, and revocation |
 | FR-008 Local redaction | `apps/connector/src/redaction.ts`, re-scanned server-side in `security.ts` |
 | FR-009 Offline queue | `apps/connector/src/queue.ts` |
 | FR-010 Heartbeat and version | `/connectors` table: state, last heartbeat, queue depth, version |
@@ -41,13 +41,13 @@ is satisfied in the shipped product.
 
 | ID | Where |
 |----|-------|
-| FR-020 Team overview | `/employees` — connector state, context, last active, sessions, usage, coverage warning per person |
+| FR-020 Team overview | Partial: `/employees` plus `/`; per-developer current-hour event count is still missing |
 | FR-021 Recent activity | `/` polls `/v1/dashboard/live` every 30s; SSE remains available at `/v1/stream/sse` |
-| FR-022 Hourly timeline | `/hourly/[id]` cards with all five durations kept separate |
+| FR-022 Hourly timeline | Partial: hourly detail exists with all five durations; the developer-day hourly-card API is not wired into the web UI |
 | FR-023 Hourly finalisation | Worker finalises at :05; late events create a new version, visible in the recalculation history |
 | FR-024 Generated summary | Deliberately not enabled. The hourly page states that metrics are deterministic and no AI narrative is attached |
 | FR-025 Drill-down | Organisation → Employees → Employee → AI tool → Sessions → Session → source events, with breadcrumbs at every level |
-| FR-026 Filters | Date range (today/yesterday/7d/30d/90d/custom) everywhere, plus team, AI tool, connector state, activity type, project, and search |
+| FR-026 Filters | Partial: date/team/tool/connector/activity/project/search exist; work item, coverage state, and clock hour remain |
 | FR-027 Notifications | Grouped in-app coverage alerts on `/` and `/connectors`. Email/Slack delivery still to do |
 | FR-028 Export | `POST /v1/activity-exports`; CSV and text, no billing conclusions |
 
@@ -77,6 +77,6 @@ Each is a distinct variant in `components/ui/States.tsx`, never interchangeable:
 
 ## Still open
 
-Legal/HR sign-off (SEC-007, SEC-010), production SSO/OIDC, Ed25519 verification
-at the API, email/Slack notification delivery, full PDF export layout, WCAG
-audit, Terraform and runbooks, and the seven-day pilot report.
+Legal/HR sign-off (SEC-007, SEC-010), production SSO/OIDC, email/Slack
+notification delivery, full PDF export layout, WCAG audit, Terraform, executed
+runbook/DR drills, and the seven-day pilot report.

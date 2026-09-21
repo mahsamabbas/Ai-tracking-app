@@ -32,11 +32,9 @@ const ROLE_TONE: Record<Role, "info" | "ok" | "neutral" | "warn"> = {
 };
 
 const ASSIGNABLE_TOOLS = [
-  { id: "cursor", label: "Cursor" },
+  { id: "cursor", label: "Cursor companion (file and task signals)" },
   { id: "claude_code", label: "Claude Code" },
   { id: "vscode", label: "VS Code companion" },
-  { id: "gemini", label: "Gemini CLI" },
-  { id: "codex", label: "Codex" },
 ] as const;
 
 interface IssuedKey {

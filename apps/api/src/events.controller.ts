@@ -6,9 +6,10 @@ import {
   Post,
   UnauthorizedException,
 } from "@nestjs/common";
-import { verifyDeviceToken } from "@techlio/server-core";
+import { getDevice, verifyDeviceToken } from "@techlio/server-core";
 import { ingestBatch } from "./services/ingest.js";
 import { DEV_ORG } from "./constants.js";
+import { verifyBatchSignature } from "./signatures.js";
 
 @Controller("v1/events")
 export class EventsController {
@@ -16,6 +17,7 @@ export class EventsController {
   async batch(
     @Headers("authorization") auth: string | undefined,
     @Headers("x-device-id") deviceHeader: string | undefined,
+    @Headers("x-signature") signature: string | undefined,
     @Body() body: unknown,
   ) {
     if (!auth?.startsWith("Bearer ")) {
@@ -33,6 +35,23 @@ export class EventsController {
     const orgId = events?.[0]?.organization_id ?? verified.organizationId ?? DEV_ORG;
     if (orgId !== verified.organizationId) {
       throw new UnauthorizedException("org_mismatch");
+    }
+
+    const device = await getDevice(orgId, deviceId);
+    const isLocalDevBypass =
+      token === "dev-device-token" && process.env.NODE_ENV !== "production";
+    if (!isLocalDevBypass) {
+      if (!device?.publicKey || !signature) {
+        throw new UnauthorizedException("signed_batch_required");
+      }
+      const validSignature = await verifyBatchSignature({
+        publicKey: device.publicKey,
+        signature,
+        body: JSON.stringify(body),
+      });
+      if (!validSignature) {
+        throw new UnauthorizedException("invalid_signature");
+      }
     }
 
     return ingestBatch(orgId, body, deviceId);

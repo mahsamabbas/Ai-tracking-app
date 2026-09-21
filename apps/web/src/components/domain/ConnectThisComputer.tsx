@@ -11,6 +11,7 @@ export async function claimLocalConnector(input: {
   deviceId: string;
   deviceToken: string;
   displayName?: string;
+  consentAccepted: boolean;
 }): Promise<{ ok: true } | { ok: false; offline: boolean; message: string }> {
   try {
     const r = await fetch(`${CONNECTOR_LOCAL}/claim`, {
@@ -21,6 +22,7 @@ export async function claimLocalConnector(input: {
         deviceId: input.deviceId,
         deviceToken: input.deviceToken,
         displayName: input.displayName,
+        consentAccepted: input.consentAccepted,
         apiBaseUrl: API_BASE,
       }),
     });

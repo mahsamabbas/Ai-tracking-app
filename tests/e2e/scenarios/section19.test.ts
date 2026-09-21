@@ -84,7 +84,7 @@ describe("Section 19 required scenarios", () => {
     ).toBe(true);
   });
 
-  it("replayed event id rejected by server-core secret scan", () => {
+  it("secret metadata is detected by the server-core scan", () => {
     expect(scanEventForSecrets({ metadata: { tool_name: "safe" } })).toBeNull();
     expect(
       scanEventForSecrets({

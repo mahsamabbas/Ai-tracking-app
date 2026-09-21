@@ -123,6 +123,35 @@ export async function getDevice(
 }
 
 /**
+ * Bind an installation's signing key exactly once. Re-activation by the same
+ * installation is allowed; replacing the key requires revoking and reissuing
+ * the admin credential.
+ */
+export async function bindDevicePublicKey(
+  organizationId: string,
+  deviceId: string,
+  publicKey: string,
+): Promise<boolean> {
+  if (!publicKey || publicKey.length > 256) return false;
+  const updated = await db
+    .update(devices)
+    .set({ publicKey })
+    .where(
+      and(
+        eq(devices.organizationId, organizationId),
+        eq(devices.id, deviceId),
+        isNull(devices.revokedAt),
+        isNull(devices.publicKey),
+      ),
+    )
+    .returning({ id: devices.id });
+  if (updated.length > 0) return true;
+
+  const existing = await getDevice(organizationId, deviceId);
+  return existing?.revokedAt == null && existing?.publicKey === publicKey;
+}
+
+/**
  * A heartbeat from the local connector is proof that *this* device is running.
  * Seeded sample tools for the same person (e.g. Claude Code on Alex) are not
  * a process check — they get frozen so the dashboard cannot show them online.

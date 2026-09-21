@@ -191,21 +191,21 @@ Header fallback `x-role: manager` still exists for local tests unless `ALLOW_DEV
 
 ### 6.1 On the developer machine
 
-1. Connector starts, loads/creates an Ed25519 signing key, opens encrypted SQLite at `.techlio-connector/queue.db`.
+1. Connector starts unpaired (unless a saved local identity exists), loads or
+   creates an Ed25519 signing key, and opens encrypted SQLite at
+   `.techlio-connector/queue.db`.
 2. Every ~30s it enqueues `heartbeat_sent` (queue depth, pause flag, provider) and flushes the queue to the API.
 3. Pause/resume emits `telemetry_gap_started` / `telemetry_gap_ended` plus connector paused/resumed. The dashboard must treat this as a **coverage gap**.
 4. Claude Code: `POST http://127.0.0.1:9477/hooks/claude` → `@techlio/provider-adapters`.
-5. Before upload, `sanitizeEvent` strips secrets and disallowed fields.
+5. Activation requires an admin-issued device ID/token and collection-notice
+   acknowledgement; it binds the installation's public key.
+6. Before upload, `sanitizeEvent` strips secrets and disallowed fields.
+7. Upload rows remain queued until the API acknowledges a valid signed batch.
 
-Default connector identity (Alex):
-
-| Field | UUID / value |
-|-------|----------------|
-| Organization | `550e8400-e29b-41d4-a716-446655440010` |
-| Developer (Alex) | `550e8400-e29b-41d4-a716-446655440011` |
-| Device | `550e8400-e29b-41d4-a716-446655440012` |
-| Device token | `dev-device-token` (dev only) |
-| Sam’s developer id | `550e8400-e29b-41d4-a716-446655440021` |
+There is no default live identity. Seeded Alex/Sam UUIDs are demo-directory data,
+not connector ownership. Local pairing is stored in
+`~/.techlio-connector/identity.json`; `dev-device-token` is a non-production
+test bypass only.
 
 ### 6.2 Ingestion (`packages/server-core` → `ingestBatch`)
 
@@ -311,7 +311,8 @@ If the provider does not expose a metric, show **“Not available from provider�
 
 | Tier | Examples | Hourly model/tool/session |
 |------|----------|---------------------------|
-| **A** | Claude Code, Codex, Gemini (connector hooks / OTLP) | Yes, when the agent emits it |
+| **A implemented** | Claude Code hooks | Yes, for events exposed by configured hooks |
+| **A planned** | Codex, Gemini | No adapter enabled; OTLP requests return 501 |
 | **B** | Cursor, GitHub Copilot | **Daily aggregates only** |
 
 This repo is usually opened in **Cursor**, so the local connector defaults to provider `cursor` (Tier B). Claude events are tagged `claude_code` only when Claude hooks actually fire. That is why hourly model/tool cards often show the empty state even though heartbeats and file-save events exist.
@@ -538,12 +539,10 @@ Still missing live integration: offline queue → later upload, long idle, late-
 |------|--------|
 | Legal / HR monitoring notice (SEC-007, SEC-010) | Draft only |
 | Production SSO / OIDC (FR-001) | JWT only |
-| Ed25519 verify on API ingest (SEC-006) | Connector signs; API enforcement not production-hard |
 | LLM hourly narrative (FR-024) | Deferred; UI says metrics are deterministic |
 | Email / Slack notifications (FR-027) | In-app alerts only |
 | Full PDF layout (FR-028) | Text/CSV stand-in |
 | Codex / Gemini OTLP adapters (FR-006) | Claude hooks exist; others pending |
-| Worker hourly job for **every** developer | Seeded Alex id today |
 | TLS, encryption at rest, Terraform, WCAG 2.1 AA audit | Production ops |
 | 7-day pilot + report, Phase 0 live Claude validation | Human process |
 | Signed connector binaries / OS keychain | Packaging |

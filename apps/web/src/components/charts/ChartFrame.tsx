@@ -2,6 +2,7 @@
 
 import { ResponsiveContainer } from "recharts";
 import { EmptyState } from "@/components/ui/States";
+import type { EmptyVariant } from "@/components/ui/States";
 
 export function ChartFrame({
   height = 240,
@@ -13,7 +14,7 @@ export function ChartFrame({
 }: {
   height?: number;
   isEmpty?: boolean;
-  emptyVariant?: "no-activity" | "no-results" | "provider-missing" | "connector-offline";
+  emptyVariant?: EmptyVariant;
   emptyTitle?: string;
   emptyBody?: string;
   children: React.ReactElement;

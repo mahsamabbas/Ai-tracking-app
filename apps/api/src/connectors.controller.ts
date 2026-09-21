@@ -22,6 +22,7 @@ import {
   hashDeviceToken,
   ingestBatch,
   getDevice,
+  bindDevicePublicKey,
   canPauseConnector,
   canRegisterConnector,
   canViewConnectorHealth,
@@ -94,13 +95,26 @@ export class ConnectorsController {
   @UseGuards(DashboardAuthGuard)
   async activate(
     @Req() req: FastifyRequest,
-    @Body() body: { deviceId?: string; token?: string },
+    @Body()
+    body: {
+      deviceId?: string;
+      token?: string;
+      publicKey?: string;
+      consentAccepted?: boolean;
+      consentVersion?: string;
+    },
   ) {
     const user = userFromRequest(req);
     const deviceId = body.deviceId?.trim();
     const token = body.token?.trim();
     if (!deviceId || !token) {
       throw new UnauthorizedException("device_id_and_token_required");
+    }
+    if (!body.publicKey) {
+      throw new UnauthorizedException("public_key_required");
+    }
+    if (body.consentAccepted !== true || !body.consentVersion?.trim()) {
+      throw new ForbiddenException("collection_notice_required");
     }
     const verified = await verifyDeviceToken(deviceId, token);
     if (!verified.ok || !verified.organizationId || !verified.developerId) {
@@ -119,6 +133,25 @@ export class ConnectorsController {
     if (!device || device.revokedAt) {
       throw new NotFoundException("device_not_found");
     }
+    const bound = await bindDevicePublicKey(
+      verified.organizationId,
+      deviceId,
+      body.publicKey,
+    );
+    if (!bound) {
+      throw new ForbiddenException("signing_key_mismatch");
+    }
+    await db.insert(auditLog).values({
+      organizationId: verified.organizationId,
+      actorId: user.id,
+      action: "connector.consent_accepted",
+      detail: {
+        deviceId,
+        developerId: verified.developerId,
+        consentVersion: body.consentVersion.trim().slice(0, 64),
+      },
+      createdAt: new Date(),
+    });
     return {
       deviceId: device.id,
       developerId: device.developerId,

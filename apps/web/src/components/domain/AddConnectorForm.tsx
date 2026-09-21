@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Callout } from "@/components/ui/Callout";
 import { claimLocalConnector } from "@/components/domain/ConnectThisComputer";
@@ -20,12 +21,10 @@ const SETUP: Record<string, string[]> = {
     "In VS Code: Extensions → Install from VSIX → Techlio companion.",
   ],
   gemini: [
-    "Keep the Techlio connector running.",
-    "Send OTLP traces to http://127.0.0.1:9477/v1/traces",
+    "Gemini activation is unavailable until its normalized event adapter is implemented.",
   ],
   codex: [
-    "Keep the Techlio connector running.",
-    "Send OTLP traces to http://127.0.0.1:9477/v1/traces",
+    "Codex activation is unavailable until its normalized event adapter is implemented.",
   ],
 };
 
@@ -42,6 +41,7 @@ export function ActivateConnectorForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -54,6 +54,7 @@ export function ActivateConnectorForm({
       deviceId: deviceId.trim(),
       deviceToken: deviceToken.trim(),
       displayName,
+      consentAccepted,
     });
     setBusy(false);
     if (!res.ok) {
@@ -63,6 +64,7 @@ export function ActivateConnectorForm({
     setOk(true);
     setDeviceId("");
     setDeviceToken("");
+    setConsentAccepted(false);
     onActivated?.();
   }
 
@@ -95,7 +97,28 @@ export function ActivateConnectorForm({
         You can only activate a key your administrator assigned to you. You cannot create new
         connectors or pick extra AI tools here.
       </p>
-      <button type="submit" className="btn-primary w-full" disabled={busy || !token}>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={consentAccepted}
+          onChange={(e) => setConsentAccepted(e.target.checked)}
+          required
+        />
+        <span>
+          I reviewed the{" "}
+          <Link href="/policy" className="text-[var(--accent)] underline">
+            collection notice
+          </Link>
+          , including collected metadata, exclusions, retention, pause behavior, and dispute
+          process.
+        </span>
+      </label>
+      <button
+        type="submit"
+        className="btn-primary w-full"
+        disabled={busy || !token || !consentAccepted}
+      >
         {busy ? "Activating…" : "Activate on this computer"}
       </button>
       {error ? <Callout tone="bad" title={error} /> : null}

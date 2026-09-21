@@ -2,6 +2,7 @@ import { Queue, Worker } from "bullmq";
 import {
   finalizeHourForDeveloper,
   ingestBatch,
+  listHourlyTargets,
   purgeEventsOlderThan,
 } from "@techlio/server-core";
 import {
@@ -58,8 +59,16 @@ new Worker(
   "hourly-finalize",
   async (job) => {
     const hour = new Date(job.data.hour as string);
-    const id = await finalizeHourForDeveloper(ORG, DEV, hour, 1);
-    console.log("Finalized hour", hour.toISOString(), id);
+    const targets = await listHourlyTargets();
+    const ids = await Promise.all(
+      targets.map(({ organizationId, developerId }) =>
+        finalizeHourForDeveloper(organizationId, developerId, hour, 1),
+      ),
+    );
+    console.log("Finalized hour", hour.toISOString(), {
+      developers: targets.length,
+      snapshots: ids.length,
+    });
   },
   { connection },
 );
@@ -67,14 +76,16 @@ new Worker(
 new Worker(
   "hourly-recalc",
   async (job) => {
-    const { hour, version, reason } = job.data as {
+    const { organizationId, developerId, hour, version, reason } = job.data as {
+      organizationId: string;
+      developerId: string;
       hour: string;
       version: number;
       reason: string;
     };
     const id = await finalizeHourForDeveloper(
-      ORG,
-      DEV,
+      organizationId,
+      developerId,
       new Date(hour),
       version,
       reason,
