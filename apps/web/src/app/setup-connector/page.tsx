@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { OnboardingStepper } from "@/components/onboarding/OnboardingStepper";
 import { ConnectorInstallGuide } from "@/components/domain/ConnectorInstallGuide";
 import { ThisComputerStatus } from "@/components/domain/ConnectThisComputer";
 import { Callout } from "@/components/ui/Callout";
@@ -31,10 +32,12 @@ export default function SetupConnectorPage() {
       title="Required setup"
       subtitle="You must finish this on this computer before the dashboard is available"
     >
-      <div className="mb-5 space-y-4">
+      <div className="mb-5 space-y-4" data-onboarding="onboard-welcome">
+        <OnboardingStepper />
         <Callout tone="warn" title="Local agent is mandatory">
           Techlio only works when a small program on <strong>this</strong> Mac or PC collects AI
-          tool activity and uploads it with your assigned key. Complete all steps below to continue.
+          tool activity and uploads it with your assigned key. Follow the steps below — use{" "}
+          <strong>Show guided tour</strong> for arrow pointers on each step.
         </Callout>
         <ThisComputerStatus />
         <ConnectorInstallGuide />

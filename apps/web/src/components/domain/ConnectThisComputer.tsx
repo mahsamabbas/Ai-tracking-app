@@ -99,7 +99,7 @@ export function ThisComputerStatus() {
     return (
       <Callout tone="warn" title="Connector not running on this computer">
         Install the background connector from the bar at the bottom of the page, or run{" "}
-        <code className="text-xs">pnpm dev:connector</code> from the repo, then activate your
+        <code className="code-inline">pnpm dev:connector</code> from the repo, then activate your
         key.
       </Callout>
     );

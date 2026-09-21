@@ -170,8 +170,15 @@ export function AppShell({
             <Link
               key={item.href}
               href={item.href}
+              data-onboarding={
+                item.href === "/my-connectors" ? "onboard-nav-connectors" : undefined
+              }
               aria-current={active ? "page" : undefined}
               className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                onboardingLocked && item.href === "/my-connectors"
+                  ? "ring-2 ring-brand-400 ring-offset-2 ring-offset-card dark:ring-offset-card"
+                  : ""
+              } ${
                 active
                   ? "bg-brand-50 text-brand-700"
                   : "text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/5"

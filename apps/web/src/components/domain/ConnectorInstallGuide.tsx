@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import {
   CONNECTOR_INSTALL_SCRIPT_PATH,
+  CONNECTOR_INSTALL_SCRIPT_WINDOWS,
   connectorInstallCommand,
   detectConnectorPlatform,
   useConnectorOnline,
@@ -17,7 +18,7 @@ function StepBadge({ done, n }: { done: boolean; n: number }) {
       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
         done
           ? "bg-emerald-600 text-white"
-          : "border border-ink-300 bg-surface-50 text-ink-600 dark:border-ink-600 dark:bg-ink-900"
+          : "border border-line bg-slate-100 text-ink-700 dark:bg-slate-800 dark:text-ink-700"
       }`}
       aria-hidden
     >
@@ -33,7 +34,10 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
   const [copied, setCopied] = useState(false);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const installCmd = useMemo(() => connectorInstallCommand(origin), [origin]);
+  const installCmd = useMemo(
+    () => connectorInstallCommand(origin, platform === "windows" ? "windows" : "mac"),
+    [origin, platform],
+  );
 
   async function copyCommand() {
     await navigator.clipboard.writeText(installCmd);
@@ -48,67 +52,89 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
 
   const steps = (
     <ol className="space-y-4">
-      <li className="flex gap-3">
+      <li className="flex gap-3" data-onboarding="onboard-install">
         <StepBadge done={step1Done} n={1} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-            Install the local agent on this computer
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-ink-600 dark:text-ink-400">
+          <p className="text-sm font-semibold text-ink-900">Install the local agent on this computer</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-700">
             The dashboard runs in the cloud, but AI tools (Cursor, Claude) only talk to a small
-            program on <strong>your</strong> Mac or PC. Each teammate installs once on their own
-            machine — your install does not track anyone else.
+            program on <strong className="font-semibold text-ink-900">your</strong> Mac or PC. Each
+            teammate installs once on their own machine — your install does not track anyone else.
           </p>
-          {platform === "mac" ? (
+          {platform === "mac" || platform === "windows" ? (
             <div className="mt-3 flex flex-wrap gap-2">
-              <a href={CONNECTOR_INSTALL_SCRIPT_PATH} download className="btn-primary h-9 text-xs">
-                Download macOS installer
+              <a
+                href={
+                  platform === "windows"
+                    ? CONNECTOR_INSTALL_SCRIPT_WINDOWS
+                    : CONNECTOR_INSTALL_SCRIPT_PATH
+                }
+                download={
+                  platform === "windows"
+                    ? "install-connector-windows.ps1"
+                    : "install-connector-macos.sh"
+                }
+                className="btn-primary h-9 text-xs"
+              >
+                {platform === "windows" ? "Download Windows installer" : "Download macOS installer"}
               </a>
               <button type="button" className="btn-ghost h-9 text-xs" onClick={() => void copyCommand()}>
-                {copied ? "Copied" : "Copy Terminal command"}
+                {copied ? "Copied" : platform === "windows" ? "Copy PowerShell command" : "Copy Terminal command"}
               </button>
               <button type="button" className="btn-ghost h-9 text-xs" onClick={() => void refresh()}>
                 Check if running
               </button>
             </div>
-          ) : platform === "windows" ? (
-            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-              Windows installer is coming soon. For now, clone the repo and run{" "}
-              <code className="font-mono">pnpm dev:connector</code> while you work.
-            </p>
           ) : (
-            <p className="mt-2 text-xs text-ink-500">
-              Use macOS for the one-click installer, or run{" "}
-              <code className="font-mono">pnpm dev:connector</code> from the project repo.
+            <p className="mt-2 text-xs text-ink-700">
+              Use the Windows or macOS installer on a supported PC, or run{" "}
+              <code className="code-inline">pnpm dev:connector</code> from the project repo.
             </p>
           )}
+          {platform === "windows" ? (
+            <p className="mt-2 text-xs text-ink-700">
+              Prerequisites:{" "}
+              <a
+                href="https://nodejs.org"
+                className="font-medium text-brand-700 underline dark:text-brand-400"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Node.js 20+
+              </a>
+              , pnpm (<code className="code-inline">npm i -g pnpm</code>), and a clone of the Techlio
+              repo. The installer registers a sign-in task so port 9477 stays up.
+            </p>
+          ) : null}
           {online === false ? (
             <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
               Not detected yet on 127.0.0.1:9477 — complete the install, then click “Check if running”.
             </p>
           ) : null}
           {online === true ? (
-            <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <p className="mt-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">
               Local agent is running.
             </p>
           ) : null}
           {!compact ? (
-            <pre className="mt-2 overflow-x-auto rounded-lg bg-ink-900 px-3 py-2 text-[11px] text-ink-100">
-              {installCmd}
-            </pre>
+            <div>
+              <p className="mt-3 text-2xs font-semibold uppercase tracking-wide text-ink-500">
+                Install command
+              </p>
+              <pre className="code-snippet">{installCmd}</pre>
+            </div>
           ) : null}
         </div>
       </li>
 
-      <li className="flex gap-3">
+      <li className="flex gap-3" data-onboarding="onboard-key">
         <StepBadge done={false} n={2} />
         <div>
-          <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-            Get your connector key from your administrator
-          </p>
-          <p className="mt-1 text-xs text-ink-600 dark:text-ink-400">
-            They create a <strong>device ID</strong> and <strong>token</strong> for you on Access /
-            Connectors. You cannot make your own key.
+          <p className="text-sm font-semibold text-ink-900">Get your connector key from your administrator</p>
+          <p className="mt-1 text-xs text-ink-700">
+            They create a <strong className="text-ink-900">device ID</strong> and{" "}
+            <strong className="text-ink-900">token</strong> for you on Access / Connectors. You cannot
+            make your own key.
           </p>
         </div>
       </li>
@@ -116,12 +142,16 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
       <li className="flex gap-3">
         <StepBadge done={step3Done} n={3} />
         <div>
-          <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-            Activate on this computer
-          </p>
-          <p className="mt-1 text-xs text-ink-600 dark:text-ink-400">
-            Open <Link href="/my-connectors" className="font-medium text-brand-600 underline">My connectors</Link>,
-            paste your key, accept consent, and activate. Activity then uploads to your organisation’s
+          <p className="text-sm font-semibold text-ink-900">Activate on this computer</p>
+          <p className="mt-1 text-xs text-ink-700">
+            Open{" "}
+            <Link
+              href="/my-connectors"
+              className="font-medium text-brand-700 underline dark:text-brand-400"
+            >
+              My connectors
+            </Link>
+            , paste your key, accept consent, and activate. Activity then uploads to your organisation’s
             dashboard.
           </p>
           {step1Done && !step3Done ? (
@@ -130,7 +160,7 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
             </Link>
           ) : null}
           {step3Done ? (
-            <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <p className="mt-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">
               Setup complete — the dashboard will open automatically.
             </p>
           ) : null}
@@ -141,21 +171,40 @@ export function ConnectorInstallGuide({ compact = false }: { compact?: boolean }
 
   if (compact) {
     return (
-      <div className="text-sm">
-        <p className="font-medium">Set up tracking on this computer</p>
-        <p className="mt-1 text-xs opacity-90">
+      <div className="text-sm text-amber-950 dark:text-amber-50">
+        <p className="font-semibold">Set up tracking on this computer</p>
+        <p className="mt-1 text-xs text-amber-900 dark:text-amber-100">
           One-time local install, then activate your admin-issued key.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <Link href="/setup-connector" className="btn-primary h-8 text-xs">
+          <Link
+            href="/setup-connector"
+            className="inline-flex h-8 items-center rounded-lg bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700"
+          >
             Open setup guide
           </Link>
-          {platform === "mac" ? (
-            <a href={CONNECTOR_INSTALL_SCRIPT_PATH} download className="btn-ghost h-8 text-xs">
+          {platform === "mac" || platform === "windows" ? (
+            <a
+              href={
+                platform === "windows"
+                  ? CONNECTOR_INSTALL_SCRIPT_WINDOWS
+                  : CONNECTOR_INSTALL_SCRIPT_PATH
+              }
+              download
+              className="inline-flex h-8 items-center rounded-lg border border-amber-800/35 bg-white/90 px-3 text-xs font-medium text-amber-950 hover:bg-white dark:border-amber-200/25 dark:bg-amber-900/60 dark:text-amber-50"
+            >
               Download installer
             </a>
           ) : null}
+          <button
+            type="button"
+            className="inline-flex h-8 items-center rounded-lg border border-amber-800/35 bg-white/90 px-3 text-xs font-medium text-amber-950 dark:border-amber-200/25 dark:bg-amber-900/60 dark:text-amber-50"
+            onClick={() => void copyCommand()}
+          >
+            {copied ? "Copied" : "Copy command"}
+          </button>
         </div>
+        <pre className="code-snippet mt-2 max-h-28 text-[10px]">{installCmd}</pre>
       </div>
     );
   }

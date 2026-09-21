@@ -8,6 +8,7 @@ import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
 import { ActivateConnectorForm } from "@/components/domain/AddConnectorForm";
+import { OnboardingStepper } from "@/components/onboarding/OnboardingStepper";
 import { ConnectorInstallGuide } from "@/components/domain/ConnectorInstallGuide";
 import { ThisComputerStatus } from "@/components/domain/ConnectThisComputer";
 import { useApi } from "@/lib/use-api";
@@ -77,11 +78,13 @@ export default function MyConnectorsPage() {
       ) : null}
 
       <div className="mb-5 space-y-4">
+        <OnboardingStepper />
         <ThisComputerStatus />
         <ConnectorInstallGuide />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
+        <div data-onboarding="onboard-activate-form">
         <Card>
           <CardHeader
             title="Activate assigned key"
@@ -101,6 +104,7 @@ export default function MyConnectorsPage() {
             )}
           </CardBody>
         </Card>
+        </div>
 
         <Card className="xl:col-span-2">
           <CardHeader

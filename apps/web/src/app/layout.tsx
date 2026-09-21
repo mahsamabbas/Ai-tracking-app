@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ConnectorOnboardingTour } from "@/components/onboarding/ConnectorOnboardingTour";
 import { ConnectorRequiredGate } from "@/components/domain/ConnectorRequiredGate";
 import { ConnectorRuntimeGuard } from "@/components/domain/ConnectorRuntimeGuard";
 import { AuthProvider } from "@/lib/auth-context";
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <AuthProvider>
             <ConnectorRequiredGate>{children}</ConnectorRequiredGate>
+            <ConnectorOnboardingTour />
             <ConnectorRuntimeGuard />
           </AuthProvider>
         </ThemeProvider>
