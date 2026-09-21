@@ -117,7 +117,7 @@ export function EmptyState({
     <div
       className={`flex flex-col items-center justify-center text-center ${compact ? "px-5 py-8" : "px-6 py-14"}`}
     >
-      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-ink-400">
+      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-ink-400 dark:bg-white/10">
         <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
           <circle cx="10" cy="10" r="7.2" />
           <path d="M10 6.4v4.2M10 13.4h.01" strokeLinecap="round" />
@@ -146,7 +146,7 @@ export function ErrorState({
       className={`flex flex-col items-center justify-center text-center ${compact ? "px-5 py-8" : "px-6 py-12"}`}
       role="alert"
     >
-      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-300">
         <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
           <path d="M10 3.2 2.6 16.2h14.8L10 3.2Z" strokeLinejoin="round" />
           <path d="M10 8v3.4M10 14h.01" strokeLinecap="round" />

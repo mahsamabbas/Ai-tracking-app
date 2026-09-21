@@ -45,7 +45,7 @@ export function ToolCard({
           </span>
           <span className="num text-xs text-ink-500">{share}% of AI time</span>
         </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
           <div
             className="h-full rounded-full"
             style={{ width: `${Math.max(2, share)}%`, background: meta.color }}

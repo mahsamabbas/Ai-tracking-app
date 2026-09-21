@@ -2,8 +2,8 @@ type Tone = "info" | "warn" | "bad";
 
 const STYLES: Record<Tone, string> = {
   info: "border-brand-200 bg-brand-50 text-brand-900",
-  warn: "border-amber-200 bg-amber-50 text-amber-900",
-  bad: "border-rose-200 bg-rose-50 text-rose-900",
+  warn: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100",
+  bad: "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-100",
 };
 
 export function Callout({

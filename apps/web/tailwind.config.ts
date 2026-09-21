@@ -1,28 +1,32 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: ["./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
-        canvas: "#f6f7f9",
-        card: "#ffffff",
-        line: { DEFAULT: "#e5e7eb", strong: "#d1d5db" },
+        canvas: "rgb(var(--color-canvas) / <alpha-value>)",
+        card: "rgb(var(--color-card) / <alpha-value>)",
+        line: {
+          DEFAULT: "rgb(var(--color-line) / <alpha-value>)",
+          strong: "rgb(var(--color-line-strong) / <alpha-value>)",
+        },
         ink: {
-          900: "#0f1115",
-          700: "#374151",
-          500: "#6b7280",
-          400: "#9ca3af",
+          900: "rgb(var(--color-ink-900) / <alpha-value>)",
+          700: "rgb(var(--color-ink-700) / <alpha-value>)",
+          500: "rgb(var(--color-ink-500) / <alpha-value>)",
+          400: "rgb(var(--color-ink-400) / <alpha-value>)",
         },
         brand: {
-          50: "#eef2ff",
-          100: "#e0e7ff",
-          200: "#c7d2fe",
-          400: "#818cf8",
-          500: "#6366f1",
-          600: "#4f46e5",
-          700: "#4338ca",
-          900: "#312e81",
+          50: "rgb(var(--color-brand-50) / <alpha-value>)",
+          100: "rgb(var(--color-brand-100) / <alpha-value>)",
+          200: "rgb(var(--color-brand-200) / <alpha-value>)",
+          400: "rgb(var(--color-brand-400) / <alpha-value>)",
+          500: "rgb(var(--color-brand-500) / <alpha-value>)",
+          600: "rgb(var(--color-brand-600) / <alpha-value>)",
+          700: "rgb(var(--color-brand-700) / <alpha-value>)",
+          900: "rgb(var(--color-brand-900) / <alpha-value>)",
         },
         state: {
           ok: "#0d9488",

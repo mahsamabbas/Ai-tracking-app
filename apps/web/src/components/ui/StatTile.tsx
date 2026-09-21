@@ -61,8 +61,8 @@ export function StatTile({
               good === null
                 ? "text-ink-500"
                 : good
-                  ? "text-teal-700"
-                  : "text-rose-700"
+                  ? "text-teal-700 dark:text-teal-400"
+                  : "text-rose-700 dark:text-rose-400"
             }`}
           >
             {formatDelta(delta)}

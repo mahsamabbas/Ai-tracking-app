@@ -30,7 +30,7 @@ export function DurationSplit({
           {formatDuration(totalMs)}
         </span>
       </div>
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
         {bands.map((b) => (
           <div
             key={b.label}

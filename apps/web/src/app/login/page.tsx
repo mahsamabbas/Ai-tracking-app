@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  biometricLabel,
+  canUsePlatformBiometrics,
+  isMobileDevice,
+  loadEnrollment,
+} from "@/lib/biometric";
 
 const DEMO = [
   { role: "Manager", email: "manager@techlio.local", password: "manager123", desc: "Team analytics, employees, sessions" },
@@ -11,11 +18,28 @@ const DEMO = [
 ];
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, unlockWithBiometric, locked } = useAuth();
   const [email, setEmail] = useState("manager@techlio.local");
   const [password, setPassword] = useState("manager123");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function check() {
+      if (!isMobileDevice()) return;
+      const enrollment = loadEnrollment();
+      if (enrollment?.email) setEmail(enrollment.email);
+      if (!enrollment) return;
+      const ok = await canUsePlatformBiometrics();
+      if (!cancelled) setBiometricAvailable(ok);
+    }
+    void check();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,9 +53,25 @@ export default function LoginPage() {
     }
   }
 
+  async function biometricUnlock() {
+    setBusy(true);
+    setError(null);
+    try {
+      await unlockWithBiometric();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Biometric unlock failed");
+      setBusy(false);
+    }
+  }
+
+  const label = biometricLabel();
+
   return (
     <div className="grid min-h-[100dvh] lg:grid-cols-2">
-      <div className="flex items-center justify-center px-6 py-12">
+      <div className="relative flex items-center justify-center px-6 py-12">
+        <div className="absolute right-4 top-4">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
@@ -70,7 +110,7 @@ export default function LoginPage() {
               />
             </label>
             {error ? (
-              <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800" role="alert">
+              <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-950 dark:text-rose-200" role="alert">
                 {error}
               </p>
             ) : null}
@@ -79,6 +119,31 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {biometricAvailable || locked ? (
+            <div className="mt-5 lg:hidden">
+              <div className="relative my-4">
+                <div className="divider" />
+                <p className="absolute inset-x-0 -top-2.5 text-center">
+                  <span className="bg-canvas px-2 text-2xs uppercase tracking-wide text-ink-400">
+                    {locked ? "This phone" : "or"}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost w-full"
+                disabled={busy}
+                onClick={() => void biometricUnlock()}
+              >
+                {busy ? "Waiting…" : `Unlock with ${label}`}
+              </button>
+              <p className="hint mt-2">
+                {label} is available on this phone only. Desktop sign-in still uses email and
+                password.
+              </p>
+            </div>
+          ) : null}
+
           <p className="mt-6 text-2xs leading-relaxed text-ink-400">
             This system records metadata about work performed through connected AI coding agents.
             It does not capture prompts, responses, source code, keystrokes, or screenshots.
@@ -86,7 +151,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="hidden flex-col justify-center bg-ink-900 px-10 py-12 lg:flex">
+      <div className="hidden flex-col justify-center bg-slate-950 px-10 py-12 lg:flex">
         <p className="label text-brand-200">Demo accounts</p>
         <h2 className="mt-2 text-xl font-semibold text-white">
           Four portals, one dataset

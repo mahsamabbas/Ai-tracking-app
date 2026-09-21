@@ -29,7 +29,7 @@ export function BarList({ items, emptyLabel = "No data in this period" }: {
                 {item.formatted}
               </span>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -44,7 +44,7 @@ export function BarList({ items, emptyLabel = "No data in this period" }: {
         return (
           <li key={item.label}>
             {item.href ? (
-              <Link href={item.href} className="block rounded-lg p-1 -m-1 transition hover:bg-slate-50">
+              <Link href={item.href} className="block rounded-lg p-1 -m-1 transition hover:bg-slate-50 dark:hover:bg-white/5">
                 {inner}
               </Link>
             ) : (

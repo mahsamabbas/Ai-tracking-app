@@ -273,7 +273,7 @@ export default function EmployeesPage() {
                           ) : (
                             <div className="inline-flex flex-col items-end gap-1">
                               <span className="num text-sm text-ink-700">{productivePct}%</span>
-                              <span className="block h-1 w-14 overflow-hidden rounded-full bg-slate-100">
+                              <span className="block h-1 w-14 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
                                 <span
                                   className="block h-full rounded-full bg-teal-500"
                                   style={{ width: `${productivePct}%` }}

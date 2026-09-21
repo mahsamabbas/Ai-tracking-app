@@ -10,6 +10,11 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { API_BASE } from "./api";
+import {
+  isMobileDevice,
+  loadEnrollment,
+  verifyPlatformBiometrics,
+} from "./biometric";
 import { homePathForRole } from "./permissions";
 import type { Role } from "./types";
 
@@ -29,7 +34,9 @@ interface AuthState {
   token: string | null;
   user: PortalUser | null;
   ready: boolean;
+  locked: boolean;
   login: (email: string, password: string) => Promise<void>;
+  unlockWithBiometric: () => Promise<void>;
   logout: () => void;
 }
 
@@ -37,20 +44,33 @@ const AuthContext = createContext<AuthState>({
   token: null,
   user: null,
   ready: false,
+  locked: false,
   login: async () => {},
+  unlockWithBiometric: async () => {},
   logout: () => {},
 });
+
+async function fetchCurrentUser(stored: string): Promise<PortalUser> {
+  const r = await fetch(`${API_BASE}/v1/auth/me`, {
+    headers: { Authorization: `Bearer ${stored}` },
+  });
+  if (!r.ok) throw new Error("expired");
+  const json = await r.json();
+  return json.user as PortalUser;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<PortalUser | null>(null);
   const [ready, setReady] = useState(false);
+  const [locked, setLocked] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
+    setLocked(false);
     try {
       localStorage.removeItem(TOKEN_KEY);
     } catch {
@@ -75,10 +95,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         /* private mode */
       }
+      setLocked(false);
       router.push(json.homePath ?? homePathForRole(json.user.role, json.user.developerId));
     },
     [router],
   );
+
+  const unlockWithBiometric = useCallback(async () => {
+    await verifyPlatformBiometrics();
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(TOKEN_KEY);
+    } catch {
+      stored = null;
+    }
+    if (!stored) {
+      throw new Error(
+        "Sign in with your password once on this phone, then enable biometric unlock.",
+      );
+    }
+    const nextUser = await fetchCurrentUser(stored);
+    setToken(stored);
+    setUser(nextUser);
+    setLocked(false);
+    router.push(homePathForRole(nextUser.role, nextUser.developerId));
+  }, [router]);
 
   useEffect(() => {
     let stored: string | null = null;
@@ -91,14 +132,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setReady(true);
       return;
     }
-    fetch(`${API_BASE}/v1/auth/me`, {
-      headers: { Authorization: `Bearer ${stored}` },
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error("expired");
-        const json = await r.json();
+    const requireBiometric = isMobileDevice() && Boolean(loadEnrollment());
+    if (requireBiometric) {
+      setLocked(true);
+      setReady(true);
+      return;
+    }
+    fetchCurrentUser(stored)
+      .then((nextUser) => {
         setToken(stored);
-        setUser(json.user);
+        setUser(nextUser);
       })
       .catch(() => {
         try {
@@ -113,15 +156,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     const isPublic = PUBLIC_PATHS.includes(pathname);
-    if (!token && !isPublic) router.replace("/login");
-    if (token && isPublic) {
+    if ((!token || locked) && !isPublic) router.replace("/login");
+    if (token && !locked && isPublic) {
       router.replace(homePathForRole(user?.role, user?.developerId));
     }
-  }, [ready, token, pathname, router, user?.role, user?.developerId]);
+  }, [ready, token, locked, pathname, router, user?.role, user?.developerId]);
 
   const value = useMemo<AuthState>(
-    () => ({ token, user, ready, login, logout }),
-    [token, user, ready, login, logout],
+    () => ({ token, user, ready, locked, login, unlockWithBiometric, logout }),
+    [token, user, ready, locked, login, unlockWithBiometric, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

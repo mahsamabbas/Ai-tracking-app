@@ -36,13 +36,13 @@ export function ChartFrame({
 }
 
 export const AXIS = {
-  tick: { fontSize: 11, fill: "#6b7280" },
+  tick: { fontSize: 11, fill: "var(--chart-axis)" },
   axisLine: false as const,
   tickLine: false as const,
 };
 
 export const GRID = {
-  stroke: "#eef0f3",
+  stroke: "var(--chart-grid)",
   strokeDasharray: "0",
   vertical: false as const,
 };

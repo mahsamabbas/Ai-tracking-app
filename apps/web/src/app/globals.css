@@ -4,6 +4,22 @@
 
 @layer base {
   :root {
+    --color-canvas: 246 247 249;
+    --color-card: 255 255 255;
+    --color-line: 229 231 235;
+    --color-line-strong: 209 213 219;
+    --color-ink-900: 15 17 21;
+    --color-ink-700: 55 65 81;
+    --color-ink-500: 107 114 128;
+    --color-ink-400: 156 163 175;
+    --color-brand-50: 238 242 255;
+    --color-brand-100: 224 231 255;
+    --color-brand-200: 199 210 254;
+    --color-brand-400: 129 140 248;
+    --color-brand-500: 99 102 241;
+    --color-brand-600: 79 70 229;
+    --color-brand-700: 67 56 202;
+    --color-brand-900: 49 46 129;
     --chart-1: #4f46e5;
     --chart-2: #0d9488;
     --chart-3: #f59e0b;
@@ -11,6 +27,30 @@
     --chart-5: #7c3aed;
     --chart-6: #0ea5e9;
     --chart-idle: #cbd5e1;
+    --chart-grid: #eef0f3;
+    --chart-axis: #6b7280;
+  }
+  html.dark {
+    --color-canvas: 15 18 24;
+    --color-card: 23 27 34;
+    --color-line: 42 49 64;
+    --color-line-strong: 59 68 84;
+    --color-ink-900: 243 244 246;
+    --color-ink-700: 209 213 219;
+    --color-ink-500: 156 163 175;
+    --color-ink-400: 107 114 128;
+    --color-brand-50: 30 27 75;
+    --color-brand-100: 49 46 129;
+    --color-brand-200: 67 56 202;
+    --color-brand-400: 129 140 248;
+    --color-brand-500: 99 102 241;
+    --color-brand-600: 129 140 248;
+    --color-brand-700: 165 180 252;
+    --color-brand-900: 199 210 254;
+    --chart-idle: #475569;
+    --chart-grid: #2a3140;
+    --chart-axis: #9ca3af;
+    color-scheme: dark;
   }
   html,
   body {
@@ -24,6 +64,10 @@
   }
   *:focus-visible {
     @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-canvas;
+  }
+  html.dark input[type="date"],
+  html.dark input[type="time"] {
+    color-scheme: dark;
   }
 }
 
@@ -64,19 +108,19 @@
     @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-2xs font-medium;
   }
   .badge-ok {
-    @apply badge bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200;
+    @apply badge bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200 dark:bg-teal-950 dark:text-teal-200 dark:ring-teal-800;
   }
   .badge-warn {
-    @apply badge bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200;
+    @apply badge bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-800;
   }
   .badge-bad {
-    @apply badge bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-200;
+    @apply badge bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-200 dark:bg-rose-950 dark:text-rose-200 dark:ring-rose-800;
   }
   .badge-info {
     @apply badge bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200;
   }
   .badge-neutral {
-    @apply badge bg-slate-100 text-ink-700 ring-1 ring-inset ring-slate-200;
+    @apply badge bg-slate-100 text-ink-700 ring-1 ring-inset ring-slate-200 dark:bg-white/10 dark:text-ink-700 dark:ring-white/10;
   }
 
   /* ---------- controls ---------- */
@@ -87,10 +131,10 @@
     @apply btn bg-brand-600 text-white hover:bg-brand-700;
   }
   .btn-ghost {
-    @apply btn border border-line bg-card text-ink-700 hover:bg-slate-50;
+    @apply btn border border-line bg-card text-ink-700 hover:bg-slate-50 dark:hover:bg-white/5;
   }
   .btn-quiet {
-    @apply btn px-2 text-ink-500 hover:bg-slate-100 hover:text-ink-900;
+    @apply btn px-2 text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/10;
   }
   .field {
     @apply h-9 w-full rounded-lg border border-line bg-card px-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500;
@@ -110,7 +154,7 @@
     @apply w-full border-collapse text-sm;
   }
   .tbl thead th {
-    @apply whitespace-nowrap border-b border-line bg-slate-50/70 px-4 py-2.5 text-left text-2xs font-semibold uppercase tracking-[0.06em] text-ink-500;
+    @apply whitespace-nowrap border-b border-line bg-slate-50/70 px-4 py-2.5 text-left text-2xs font-semibold uppercase tracking-[0.06em] text-ink-500 dark:bg-white/5;
   }
   .tbl tbody td {
     @apply border-b border-line/70 px-4 py-3 align-middle;
@@ -119,7 +163,7 @@
     @apply border-b-0;
   }
   .row-link {
-    @apply cursor-pointer transition hover:bg-brand-50/50;
+    @apply cursor-pointer transition hover:bg-brand-50/50 dark:hover:bg-white/5;
   }
 
   /* ---------- misc ---------- */
@@ -127,7 +171,7 @@
     @apply h-px w-full bg-line;
   }
   .skeleton {
-    @apply animate-pulse rounded-md bg-slate-200/70;
+    @apply animate-pulse rounded-md bg-slate-200/70 dark:bg-white/10;
   }
   .scroll-x {
     @apply -mx-5 overflow-x-auto px-5;

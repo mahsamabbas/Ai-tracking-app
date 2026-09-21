@@ -7,6 +7,8 @@ import { useAuth } from "@/lib/auth-context";
 import { ROLE_LABEL, ROLE_SCOPE } from "@/lib/permissions";
 import { initialsOf } from "@/lib/format";
 import type { Role } from "@/lib/types";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { BiometricSetup } from "@/components/BiometricSetup";
 
 interface NavItem {
   href: string;
@@ -153,7 +155,7 @@ export function AppShell({
               className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
                 active
                   ? "bg-brand-50 text-brand-700"
-                  : "text-ink-500 hover:bg-slate-100 hover:text-ink-900"
+                  : "text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/5"
               }`}
             >
               <span className={active ? "text-brand-600" : "text-ink-400"}>{item.icon}</span>
@@ -164,7 +166,7 @@ export function AppShell({
       </nav>
 
       <div className="border-t border-line p-3">
-        <div className="rounded-lg bg-slate-50 p-3">
+        <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
           <p className="text-2xs font-semibold uppercase tracking-wide text-ink-500">
             {ROLE_LABEL[user.role]}
           </p>
@@ -207,7 +209,7 @@ export function AppShell({
           <button
             type="button"
             aria-label="Close menu"
-            className="absolute inset-0 bg-ink-900/40"
+            className="absolute inset-0 bg-slate-950/40"
             onClick={() => setMenuOpen(false)}
           />
           <aside className="absolute left-0 top-0 flex h-full w-[260px] flex-col bg-card shadow-pop">
@@ -235,14 +237,16 @@ export function AppShell({
                 <h1 className="h-page truncate">{title ?? "Overview"}</h1>
                 {subtitle ? <p className="muted mt-0.5">{subtitle}</p> : null}
               </div>
-              {actions ? (
-                <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
-              ) : null}
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {actions}
+                <ThemeToggle />
+              </div>
             </div>
           </div>
         </header>
 
         <main className={`mx-auto w-full ${maxWidth} flex-1 px-4 py-6 sm:px-6 lg:px-8`}>
+          <BiometricSetup />
           {children}
         </main>
 

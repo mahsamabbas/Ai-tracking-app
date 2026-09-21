@@ -52,7 +52,7 @@ export function TrendChart({
           allowDecimals={false}
         />
         <Tooltip
-          cursor={{ stroke: "#cbd5e1" }}
+          cursor={{ stroke: "var(--chart-grid)" }}
           content={({ active, payload, label }) =>
             active && payload?.length ? (
               <TooltipShell
