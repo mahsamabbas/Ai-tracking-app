@@ -4,5 +4,7 @@ dist
 .turbo
 .techlio-connector
 .env
+.env*.local
+.env.production.api
 *.db
 *.tsbuildinfo

@@ -170,15 +170,10 @@ function enqueueHeartbeat(): void {
 
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
-const DASHBOARD_ORIGINS = ["https://tracking-app-api-t9yd.vercel.app"];
-
-/** Localhost, the deployed dashboard, and any extra TECHLIO_DASHBOARD_ORIGINS. */
+/** Localhost and TECHLIO_DASHBOARD_ORIGINS (comma-separated production dashboard URLs). */
 function dashboardOriginAllowed(origin: string): boolean {
   if (LOCAL_ORIGIN.test(origin)) return true;
-  const allowed = [
-    ...DASHBOARD_ORIGINS,
-    ...(process.env.TECHLIO_DASHBOARD_ORIGINS ?? "").split(","),
-  ]
+  const allowed = (process.env.TECHLIO_DASHBOARD_ORIGINS ?? "").split(",")
     .map((item) => item.trim())
     .filter(Boolean);
   return allowed.some((pattern) => {

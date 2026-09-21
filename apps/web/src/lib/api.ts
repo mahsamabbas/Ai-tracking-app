@@ -1,4 +1,5 @@
-export const API_BASE = "https://tracking-app-api-three.vercel.app";
+export const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export class ApiError extends Error {
   constructor(
