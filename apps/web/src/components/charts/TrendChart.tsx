@@ -30,10 +30,11 @@ export function TrendChart({
   if (!hasTime && hasSessions) {
     return (
       <div className="flex h-[220px] flex-col items-center justify-center px-6 text-center">
-        <p className="text-sm font-medium text-ink-900">Companion activity is recorded</p>
+        <p className="text-sm font-medium text-ink-900">Activity recorded, timing pending</p>
         <p className="hint mt-1 max-w-md">
-          File saves and session signals are on this page, but Cursor does not report model or
-          tool duration. This chart stays at zero until an agent reports timed operations.
+          Sessions and file activity are on this page. This chart fills in once the agent reports a
+          model request or tool call that starts and finishes, which is where timed duration comes
+          from.
         </p>
       </div>
     );

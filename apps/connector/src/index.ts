@@ -263,7 +263,7 @@ app.get("/health", async () => {
     capabilities: {
       hourly: caps?.hourly ?? false,
       otlp: hostProvider === "claude_code",
-      hooks: hostProvider === "claude_code",
+      hooks: hostProvider === "claude_code" || hostProvider === "cursor",
       companion: hostProvider === "cursor" || hostProvider === "vscode",
       missing: caps?.missing ?? [],
       emptyState: caps?.emptyState ?? "",
@@ -477,6 +477,57 @@ function rememberStart(
 }
 
 const recentAgentEvents = new Map<string, number>();
+// Cross-provider echo suppression. Cursor also runs the Claude-format hooks with
+// a full Claude environment, so one Cursor action arrives as both a Cursor event
+// and a Claude event that is impossible to tell apart at the hook. When Cursor
+// reports an action, we drop a matching Claude event that lands nearby. Real
+// Claude Code (Cursor not running) produces no Cursor event, so it is kept.
+const CROSS_ECHO_MS = 3_000;
+const CLAUDE_HOLD_MS = 500;
+const recentCursorAction = new Map<string, number>();
+const pendingClaude = new Map<string, ReturnType<typeof setTimeout>>();
+
+function actionKey(event: ActivityEvent): string {
+  return `${event.event_type}:${event.metadata?.tool_name ?? ""}:${event.metadata?.file_path ?? ""}`;
+}
+
+function emitAgentEvent(event: ActivityEvent): void {
+  if (event.metadata?.path_category) contextLabel = event.metadata.path_category;
+  if (event.session_id) activeSessionId = event.session_id;
+  queue.enqueue([event]);
+  note(describeEvent(event));
+  void flushQueue();
+}
+
+function routeAgentEvent(event: ActivityEvent): boolean {
+  const key = actionKey(event);
+  if (event.provider === "cursor") {
+    recentCursorAction.set(key, Date.now());
+    const pending = pendingClaude.get(key);
+    if (pending) {
+      clearTimeout(pending);
+      pendingClaude.delete(key);
+    }
+    emitAgentEvent(event);
+    return true;
+  }
+  if (event.provider === "claude_code") {
+    const seen = recentCursorAction.get(key) ?? 0;
+    if (Date.now() - seen < CROSS_ECHO_MS) return false; // Cursor already reported this
+    if (pendingClaude.has(key)) return false;
+    const timer = setTimeout(() => {
+      pendingClaude.delete(key);
+      const echoed = recentCursorAction.get(key) ?? 0;
+      if (Date.now() - echoed < CROSS_ECHO_MS) return; // Cursor reported during the hold
+      emitAgentEvent(event);
+    }, CLAUDE_HOLD_MS);
+    if (typeof timer.unref === "function") timer.unref();
+    pendingClaude.set(key, timer);
+    return true;
+  }
+  emitAgentEvent(event);
+  return true;
+}
 
 function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
   if (paused || !identity) return { accepted: 0, unpaired: !identity };
@@ -510,20 +561,19 @@ function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
     .filter((event): event is NonNullable<typeof event> => event !== null);
   if (!clean.length) return { accepted: 0, provider };
   const fresh = clean.filter((event) => {
-    const key = `${event.event_type}:${event.metadata?.tool_name ?? ""}:${event.metadata?.file_path ?? ""}`;
+    // Same-provider repeat guard (e.g. native + Claude-format both under Cursor).
+    const key = `${event.provider}:${actionKey(event)}`;
     const seen = recentAgentEvents.get(key) ?? 0;
-    if (Date.now() - seen < 2_000) return false;
+    if (Date.now() - seen < 2_500) return false;
     recentAgentEvents.set(key, Date.now());
     return true;
   });
   if (!fresh.length) return { accepted: 0, provider, duplicate: true };
-  if (sessionId) activeSessionId = sessionId;
-  const workspace = fresh.find((event) => event.metadata?.path_category)?.metadata?.path_category;
-  if (workspace) contextLabel = workspace;
-  queue.enqueue(fresh);
-  void flushQueue();
-  for (const event of fresh) note(describeEvent(event));
-  return { accepted: fresh.length, provider };
+  let accepted = 0;
+  for (const event of fresh) {
+    if (routeAgentEvent(event)) accepted += 1;
+  }
+  return { accepted, provider };
 }
 
 app.post("/hooks/agent", async (req) => {

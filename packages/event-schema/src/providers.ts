@@ -55,13 +55,13 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
   cursor: {
     id: "cursor",
     label: "Cursor",
-    tier: "B",
-    hourly: false,
-    missing: ["model_request", "tool_calls", "token_totals", "hourly_summary"],
+    tier: "A",
+    hourly: true,
+    missing: ["token_totals"],
     emptyState:
-      "Cursor exposes companion file and task signals plus daily Admin API aggregates; model and tool telemetry is unavailable.",
+      "Cursor hooks report prompt, tool, and file activity with timing. Token totals are not exposed by Cursor.",
     note:
-      "The IDE companion does not expose Cursor's internal model and tool operations.",
+      "Observed through Cursor agent hooks — model request timing, tool calls, and file edits. Token counts are unavailable.",
   },
   github_copilot: {
     id: "github_copilot",

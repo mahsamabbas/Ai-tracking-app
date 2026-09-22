@@ -2,8 +2,28 @@
 /**
  * Claude Code / Cursor hook. Forwards allowlisted fields only.
  * Prompt text, tool input, command text, and file contents are dropped here.
+ *
+ * The running app is identified by its own environment — not by which settings
+ * file launched the hook — so Cursor actions are never mislabelled as Claude.
  */
-const providerArg = process.argv[2] || "claude_code";
+const fallback = process.argv[2] || "claude_code";
+
+function detectProvider() {
+  // Cursor also runs Claude-format hooks, so a Cursor action can reach the
+  // Claude settings entry. Cursor markers win first — real Claude Code never
+  // sets them — so Cursor work is never mislabelled as Claude.
+  if (
+    process.env.CURSOR_AGENT ||
+    process.env.CURSOR_CONVERSATION_ID ||
+    process.env.CURSOR_TRACE_ID ||
+    process.env.CURSOR_REQUEST_ID
+  ) {
+    return "cursor";
+  }
+  if (process.env.CLAUDECODE || process.env.CLAUDE_CODE_ENTRYPOINT) return "claude_code";
+  return fallback;
+}
+
 const chunks = [];
 process.stdin.on("data", (chunk) => chunks.push(chunk));
 process.stdin.on("end", () => {
@@ -14,17 +34,20 @@ process.stdin.on("end", () => {
     raw = {};
   }
   const roots = Array.isArray(raw.workspace_roots) ? raw.workspace_roots : [];
-  const cwd = typeof raw.cwd === "string"
-    ? raw.cwd
-    : typeof roots[0] === "string"
-      ? roots[0]
-      : undefined;
-  const name = typeof raw.hook_event_name === "string" ? raw.hook_event_name : "";
-  const provider = /^[a-z]/.test(name) ? "cursor" : /^[A-Z]/.test(name) ? "claude_code" : providerArg;
+  const cwd =
+    typeof raw.cwd === "string"
+      ? raw.cwd
+      : typeof roots[0] === "string"
+        ? roots[0]
+        : undefined;
   const body = {
-    provider,
+    provider: detectProvider(),
     hook_event_name: raw.hook_event_name,
-    session_id: raw.session_id || raw.conversation_id || raw.generation_id,
+    session_id:
+      raw.session_id ||
+      raw.conversation_id ||
+      raw.generation_id ||
+      process.env.CURSOR_CONVERSATION_ID,
     tool_name: raw.tool_name || raw.tool,
     cwd,
     file_path: typeof raw.file_path === "string" ? raw.file_path : undefined,

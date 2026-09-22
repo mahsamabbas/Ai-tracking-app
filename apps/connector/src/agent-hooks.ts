@@ -29,7 +29,12 @@ function installDir(): string {
 }
 
 const HOOK_SOURCE = `#!/usr/bin/env node
-const providerArg = process.argv[2] || "claude_code";
+const fallback = process.argv[2] || "claude_code";
+function detectProvider() {
+  if (process.env.CURSOR_AGENT || process.env.CURSOR_CONVERSATION_ID || process.env.CURSOR_TRACE_ID || process.env.CURSOR_REQUEST_ID) return "cursor";
+  if (process.env.CLAUDECODE || process.env.CLAUDE_CODE_ENTRYPOINT) return "claude_code";
+  return fallback;
+}
 const chunks = [];
 process.stdin.on("data", (chunk) => chunks.push(chunk));
 process.stdin.on("end", () => {
@@ -37,12 +42,10 @@ process.stdin.on("end", () => {
   try { raw = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch { raw = {}; }
   const roots = Array.isArray(raw.workspace_roots) ? raw.workspace_roots : [];
   const cwd = typeof raw.cwd === "string" ? raw.cwd : typeof roots[0] === "string" ? roots[0] : undefined;
-  const name = typeof raw.hook_event_name === "string" ? raw.hook_event_name : "";
-  const provider = /^[a-z]/.test(name) ? "cursor" : /^[A-Z]/.test(name) ? "claude_code" : providerArg;
   const body = {
-    provider,
+    provider: detectProvider(),
     hook_event_name: raw.hook_event_name,
-    session_id: raw.session_id || raw.conversation_id || raw.generation_id,
+    session_id: raw.session_id || raw.conversation_id || raw.generation_id || process.env.CURSOR_CONVERSATION_ID,
     tool_name: raw.tool_name || raw.tool,
     cwd,
     file_path: typeof raw.file_path === "string" ? raw.file_path : undefined,
@@ -57,6 +60,13 @@ process.stdin.on("end", () => {
 });
 `;
 
+/** A packaged bun/pkg executable runs itself with --hook; dev uses node + script. */
+function isPackaged(): boolean {
+  if (process.env.TECHLIO_PACKAGED === "1") return true;
+  const exec = process.execPath.toLowerCase();
+  return !exec.includes("node") && !exec.includes("tsx");
+}
+
 function bundledScript(): string | undefined {
   try {
     return join(dirname(fileURLToPath(import.meta.url)), "../hook/report-hook.mjs");
@@ -66,6 +76,9 @@ function bundledScript(): string | undefined {
 }
 
 function commandFor(scriptPath: string, provider: "claude_code" | "cursor"): string {
+  if (isPackaged()) {
+    return `"${process.execPath}" --hook ${provider}`;
+  }
   const node = process.execPath.includes("node") ? process.execPath : "node";
   return `"${node}" "${scriptPath}" ${provider}`;
 }
@@ -140,7 +153,7 @@ function installCursor(scriptPath: string): void {
 
 /** Point Claude Code and Cursor at the local connector. Existing settings are kept. */
 export function ensureAgentHooks(): { claude: boolean; cursor: boolean } {
-  const scriptPath = installScript();
+  const scriptPath = isPackaged() ? process.execPath : installScript();
   let claude = false;
   let cursor = false;
   try {
