@@ -2,8 +2,9 @@
 
 - **Monorepo:** pnpm + Turborepo, TypeScript
 - **Connector:** separate per-machine service (localhost :9477). Employees download
-  a packaged executable from the dashboard — they do not run `pnpm` or clone this
-  repo. Encrypted file queue, Ed25519 signing, Claude hooks + IDE companion.
+  a Windows `.exe` or a macOS `.dmg` (universal app for Intel and Apple silicon)
+  from the dashboard — they do not run `pnpm` or clone this repo. Encrypted file
+  queue, Ed25519 signing, Claude hooks + IDE companion.
 - **API:** NestJS + Fastify, `@techlio/server-core` + Postgres + Drizzle
 - **Worker:** BullMQ + Redis, hourly finalize at :05 UTC
 - **Web:** Next.js 15 App Router, Tailwind, Recharts. All metrics come from the

@@ -778,6 +778,10 @@ export interface OrganizationAnalytics {
   toolCategories: ToolCategorySlice[];
   coverage: CoverageSummary;
   teams: { team: string; activeMs: number; sessions: number; employees: number }[];
+  /** Workspaces observed from allowlisted path categories, with file-change counts. */
+  projects: { name: string; fileChanges: number; sessions: number }[];
+  /** Daily file creates, edits, and deletes. Not a git commit history. */
+  changeTrend: { date: string; fileChanges: number }[];
 }
 
 export async function organizationAnalytics(input: {
@@ -807,6 +811,8 @@ export async function organizationAnalytics(input: {
     coverage,
     headcountRes,
     teamRes,
+    projects,
+    changeTrend,
   ] = await Promise.all([
     activityTotals(scope, input.range),
     activityTotals(scope, prev),
@@ -837,6 +843,8 @@ export async function organizationAnalytics(input: {
       GROUP BY COALESCE(e.team, 'Unassigned')
       ORDER BY active_ms DESC
     `),
+    workspaceFileChanges(scope, input.range),
+    fileChangeTrend(scope, input.range),
   ]);
 
   return {
@@ -855,6 +863,8 @@ export async function organizationAnalytics(input: {
     classifications: classes,
     toolCategories: categories,
     coverage,
+    projects,
+    changeTrend,
     teams: teamRes.rows.map((r) => ({
       team: r.team,
       activeMs: Number(r.active_ms ?? 0),
@@ -1039,4 +1049,87 @@ export async function projectBreakdown(
     activeMs: Number(r.active_ms ?? 0),
     sessions: r.sessions,
   }));
+}
+
+const FILE_CHANGE_TYPES = ["file_created", "file_modified", "file_deleted"] as const;
+
+function eventScope(f: ScopeFilters, range: DateRange) {
+  const parts = [
+    sql`e.organization_id = ${f.organizationId}`,
+    sql`e.occurred_at >= ${range.from}`,
+    sql`e.occurred_at < ${range.to}`,
+    sql`e.event_type IN (${sql.join(
+      FILE_CHANGE_TYPES.map((t) => sql`${t}`),
+      sql`, `,
+    )})`,
+  ];
+  if (f.developerId) parts.push(sql`e.developer_id = ${f.developerId}`);
+  if (f.developerIds?.length) {
+    parts.push(
+      sql`e.developer_id IN (${sql.join(
+        f.developerIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})`,
+    );
+  }
+  if (f.provider) parts.push(sql`e.payload->>'provider' = ${f.provider}`);
+  if (f.team) {
+    parts.push(
+      sql`e.developer_id IN (SELECT id FROM employees WHERE organization_id = ${f.organizationId} AND team = ${f.team})`,
+    );
+  }
+  return sql.join(parts, sql` AND `);
+}
+
+/** Workspaces named by the connector (folder name), with observed file changes. */
+export async function workspaceFileChanges(
+  f: ScopeFilters,
+  range: DateRange,
+): Promise<{ name: string; fileChanges: number; sessions: number }[]> {
+  const res = await db.execute<{
+    name: string;
+    file_changes: number;
+    sessions: number;
+  }>(sql`
+    SELECT COALESCE(NULLIF(e.payload->'metadata'->>'path_category', ''), 'Unassigned workspace') AS name,
+           COUNT(*)::int AS file_changes,
+           COUNT(DISTINCT e.session_id)::int AS sessions
+    FROM activity_events e
+    WHERE ${eventScope(f, range)}
+    GROUP BY 1
+    ORDER BY file_changes DESC
+    LIMIT 12
+  `);
+  return res.rows.map((r) => ({
+    name: r.name,
+    fileChanges: r.file_changes,
+    sessions: r.sessions,
+  }));
+}
+
+/** Daily file-change counts. This is agent file activity, not git commits. */
+export async function fileChangeTrend(
+  f: ScopeFilters,
+  range: DateRange,
+): Promise<{ date: string; fileChanges: number }[]> {
+  const tz = orgTimezone();
+  const res = await db.execute<{ day: string; file_changes: number }>(sql`
+    SELECT to_char((e.occurred_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
+           COUNT(*)::int AS file_changes
+    FROM activity_events e
+    WHERE ${eventScope(f, range)}
+    GROUP BY day
+    ORDER BY day ASC
+  `);
+  const byDay = new Map(res.rows.map((r) => [r.day, r.file_changes]));
+  const out: { date: string; fileChanges: number }[] = [];
+  const cursor = new Date(range.from);
+  const dayMs = 86_400_000;
+  const spanDays = Math.max(1, Math.ceil((range.to.getTime() - range.from.getTime()) / dayMs));
+  for (let i = 0; i < spanDays; i++) {
+    const day = cursor.toISOString().slice(0, 10);
+    out.push({ date: day, fileChanges: byDay.get(day) ?? 0 });
+    cursor.setTime(cursor.getTime() + dayMs);
+  }
+  return out;
 }

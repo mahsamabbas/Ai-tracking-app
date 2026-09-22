@@ -12,5 +12,6 @@ pnpm connector:pack
 Then deploy the web app so these files are served:
 
 - `/downloads/techlio-connector-win-x64.exe`
-- `/downloads/techlio-connector-macos-arm64`
-- `/downloads/techlio-connector-macos-x64`
+- `/downloads/techlio-connector-macos.dmg` (Intel and Apple silicon)
+- `/downloads/techlio-connector-macos-arm64.dmg`
+- `/downloads/techlio-connector-macos-x64.dmg`

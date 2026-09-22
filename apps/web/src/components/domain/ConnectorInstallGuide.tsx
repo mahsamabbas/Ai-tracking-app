@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import {
-  CONNECTOR_MAC_ARM,
-  CONNECTOR_MAC_INTEL,
+  CONNECTOR_MAC_DMG,
   CONNECTOR_WINDOWS_EXE,
   detectConnectorPlatform,
-  detectMacChip,
   useConnectorOnline,
   useConnectorSetupPhase,
 } from "@/lib/connector-local";
@@ -31,11 +29,8 @@ export function ConnectorInstallGuide() {
   const { online, refresh } = useConnectorOnline(5_000);
   const { phase } = useConnectorSetupPhase(4_000);
   const platform = detectConnectorPlatform();
-  const macChip = detectMacChip();
-  const macHref = macChip === "intel" ? CONNECTOR_MAC_INTEL : CONNECTOR_MAC_ARM;
-  const macLabel = macChip === "intel" ? "Download for Intel Mac" : "Download for Mac";
-  const otherMacHref = macChip === "intel" ? CONNECTOR_MAC_ARM : CONNECTOR_MAC_INTEL;
-  const otherMacLabel = macChip === "intel" ? "Apple silicon" : "Intel Mac";
+  const macHref = CONNECTOR_MAC_DMG;
+  const macLabel = "Download for Mac";
   const step1Done = phase === "unpaired" || phase === "ready";
   const step3Done = phase === "ready";
 
@@ -58,11 +53,6 @@ export function ConnectorInstallGuide() {
             >
               {platform === "windows" ? "Download for Windows" : macLabel}
             </a>
-            {platform === "mac" ? (
-              <a href={otherMacHref} download className="btn-ghost h-9 whitespace-nowrap text-xs">
-                {otherMacLabel}
-              </a>
-            ) : null}
             <button type="button" className="btn-ghost h-9 whitespace-nowrap text-xs" onClick={() => void refresh()}>
               Check if running
             </button>
@@ -70,7 +60,7 @@ export function ConnectorInstallGuide() {
           <p className="mt-2 text-xs leading-relaxed text-ink-700">
             {platform === "windows"
               ? "Open the downloaded file. If Windows warns you, choose More info, then Run anyway. Leave that window open while you work, then return here and click Check if running."
-              : "In Finder, right-click the downloaded file and choose Open. Do not open it in Terminal. Then return here and click Check if running."}
+              : "Open the disk image, then right-click Techlio Connector and choose Open. It runs on both Intel and Apple silicon. Do not open it in Terminal. Then return here and click Check if running."}
           </p>
           {online === false ? (
             <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">

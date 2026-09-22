@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 
 export const CONNECTOR_LOCAL = "http://127.0.0.1:9477";
 export const CONNECTOR_WINDOWS_EXE = "/downloads/techlio-connector-win-x64.exe";
-export const CONNECTOR_MAC_ARM = "/downloads/techlio-connector-macos-arm64";
-export const CONNECTOR_MAC_INTEL = "/downloads/techlio-connector-macos-x64";
+export const CONNECTOR_MAC_DMG = "/downloads/techlio-connector-macos.dmg";
+export const CONNECTOR_MAC_ARM = "/downloads/techlio-connector-macos-arm64.dmg";
+export const CONNECTOR_MAC_INTEL = "/downloads/techlio-connector-macos-x64.dmg";
 
 export function connectorDownloadPath(platform: "mac" | "windows" | "other"): string {
   if (platform === "windows") return CONNECTOR_WINDOWS_EXE;
-  return CONNECTOR_MAC_ARM;
+  return CONNECTOR_MAC_DMG;
 }
 
 export async function fetchConnectorHealth(): Promise<boolean> {

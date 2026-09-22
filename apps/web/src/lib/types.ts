@@ -87,6 +87,8 @@ export interface OrganizationAnalytics {
   toolCategories: { category: string; calls: number }[];
   coverage: CoverageSummary;
   teams: { team: string; activeMs: number; sessions: number; employees: number }[];
+  projects?: { name: string; fileChanges: number; sessions: number }[];
+  changeTrend?: { date: string; fileChanges: number }[];
   scope: "self" | "organization";
 }
 
