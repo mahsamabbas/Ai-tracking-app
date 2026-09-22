@@ -18,7 +18,9 @@
     "lint": "turbo run lint",
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "pnpm --filter @techlio/server-core run build && pnpm --filter @techlio/api exec tsx src/scripts/seed.ts",
-    "db:reset": "pnpm db:migrate && pnpm db:seed"
+    "db:reset": "pnpm db:migrate && pnpm db:seed",
+    "deploy:all": "bash scripts/deploy-all.sh",
+    "deploy:all:connector": "bash scripts/deploy-all.sh --with-connector"
   },
   "devDependencies": {
     "turbo": "^2.3.3",
