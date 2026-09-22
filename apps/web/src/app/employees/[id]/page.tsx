@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -46,12 +46,24 @@ import type { ActivityEventRow, EmployeeAnalytics, LiveStatus } from "@/lib/type
 
 export default function EmployeeDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const { user } = useAuth();
   const [range, setRange] = useState<RangeValue>({ preset: "7d" });
 
+  const employeeId =
+    id === "self" && user?.developerId ? user.developerId : id;
+
+  useEffect(() => {
+    if (id === "self" && user?.developerId && user.developerId !== id) {
+      router.replace(`/employees/${user.developerId}`);
+    }
+  }, [id, user?.developerId, router]);
+
   const query = useApi<EmployeeAnalytics>(
-    `/v1/employees/${id}${qs(rangeParams(range))}`,
+    employeeId && employeeId !== "self"
+      ? `/v1/employees/${employeeId}${qs(rangeParams(range))}`
+      : null,
   );
   const live = useApi<LiveStatus>("/v1/dashboard/live?limit=20", { pollMs: 45_000 });
   const timeline = useApi<{
@@ -64,11 +76,15 @@ export default function EmployeeDetailPage() {
       completeness: string;
       metrics: { eventCount?: number; mergedActiveDurationMs?: number; fileChanges?: number };
     }[];
-  }>(`/v1/developers/${id}/timeline?hours=48`);
+  }>(
+    employeeId && employeeId !== "self"
+      ? `/v1/developers/${employeeId}/timeline?hours=48`
+      : null,
+  );
 
   const d = query.data;
   const t = d?.totals;
-  const isSelf = user?.developerId === id;
+  const isSelf = user?.developerId === employeeId;
 
   const projectNames = useMemo(() => {
     const map: Record<string, string> = {};
@@ -150,7 +166,7 @@ export default function EmployeeDetailPage() {
       actions={
         d ? (
           <>
-            <Link href={`/employees/${id}/sessions`} className="btn-ghost">
+            <Link href={`/employees/${employeeId}/sessions`} className="btn-ghost">
               All sessions
               <span className="num ml-1 text-ink-400">{d.totalSessions}</span>
             </Link>
@@ -391,7 +407,7 @@ export default function EmployeeDetailPage() {
                   <ToolCard
                     key={tool.provider}
                     tool={tool}
-                    href={`/employees/${id}/tools/${tool.provider}`}
+                    href={`/employees/${employeeId}/tools/${tool.provider}`}
                     shareOfMs={t.activeMs}
                   />
                 ))}
@@ -494,7 +510,7 @@ export default function EmployeeDetailPage() {
               <CardHeader
                 title="Recent sessions"
                 subtitle="Most recent first — open one for its full event trail"
-                href={`/employees/${id}/sessions`}
+                href={`/employees/${employeeId}/sessions`}
                 hrefLabel={`All ${d.totalSessions} sessions`}
               />
               <SessionTable sessions={d.recentSessions} projectNames={projectNames} />

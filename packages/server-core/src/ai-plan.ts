@@ -6,6 +6,21 @@ function orgTimezone(): string {
   return process.env.ORG_TIMEZONE ?? "UTC";
 }
 
+function pgErrorCode(err: unknown): string | undefined {
+  if (err && typeof err === "object" && "code" in err) {
+    return String((err as { code: unknown }).code);
+  }
+  return undefined;
+}
+
+function calendarMonthBoundsJs(): { from: Date; to: Date; label: string } {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const label = now.toLocaleString("en-US", { month: "long", year: "numeric" });
+  return { from, to, label };
+}
+
 const TRACKED_PROVIDERS = ["cursor", "claude_code"] as const;
 
 export type AiPlanLimits = Partial<
@@ -41,14 +56,20 @@ function defaultLimits(): AiPlanLimits {
 }
 
 export async function getOrgAiPlanLimits(organizationId: string): Promise<AiPlanLimits> {
-  const res = await db.execute<{ ai_plan_limits: AiPlanLimits | null }>(sql`
-    SELECT ai_plan_limits FROM organizations WHERE id = ${organizationId}
-  `);
-  const fromDb = res.rows[0]?.ai_plan_limits;
-  if (fromDb && typeof fromDb === "object") {
-    return { ...defaultLimits(), ...fromDb };
+  try {
+    const res = await db.execute<{ ai_plan_limits: AiPlanLimits | null }>(sql`
+      SELECT ai_plan_limits FROM organizations WHERE id = ${organizationId}
+    `);
+    const fromDb = res.rows[0]?.ai_plan_limits;
+    if (fromDb && typeof fromDb === "object") {
+      return { ...defaultLimits(), ...fromDb };
+    }
+    return defaultLimits();
+  } catch (err) {
+    // Migration 007 not applied yet — use defaults so employee pages still load.
+    if (pgErrorCode(err) === "42703") return defaultLimits();
+    throw err;
   }
-  return defaultLimits();
 }
 
 /** Calendar month in org timezone (label + UTC bounds for session queries). */
@@ -57,22 +78,59 @@ export async function currentCalendarMonthBounds(): Promise<{
   to: Date;
   label: string;
 }> {
-  const tz = orgTimezone();
-  const res = await db.execute<{ month_start: Date; month_end: Date; label: string }>(sql`
-    SELECT
-      (date_trunc('month', timezone(${tz}, now()))) AT TIME ZONE ${tz} AS month_start,
-      (date_trunc('month', timezone(${tz}, now())) + interval '1 month') AT TIME ZONE ${tz} AS month_end,
-      to_char(timezone(${tz}, now()), 'FMMonth YYYY') AS label
-  `);
-  const row = res.rows[0];
-  return {
-    from: new Date(row?.month_start ?? new Date()),
-    to: new Date(row?.month_end ?? new Date()),
-    label: row?.label?.trim() ?? "This month",
-  };
+  try {
+    const tz = orgTimezone();
+    const res = await db.execute<{ month_start: Date; month_end: Date; label: string }>(sql`
+      SELECT
+        (date_trunc('month', timezone(${tz}, now()))) AT TIME ZONE ${tz} AS month_start,
+        (date_trunc('month', timezone(${tz}, now())) + interval '1 month') AT TIME ZONE ${tz} AS month_end,
+        to_char(timezone(${tz}, now()), 'FMMonth YYYY') AS label
+    `);
+    const row = res.rows[0];
+    return {
+      from: new Date(row?.month_start ?? new Date()),
+      to: new Date(row?.month_end ?? new Date()),
+      label: row?.label?.trim() ?? "This month",
+    };
+  } catch {
+    return calendarMonthBoundsJs();
+  }
+}
+
+function fallbackEmployeeAiSubscriptions(): EmployeeAiSubscriptionRow[] {
+  const limits = defaultLimits();
+  const { label } = calendarMonthBoundsJs();
+  return TRACKED_PROVIDERS.map((provider) => {
+    const cap = PROVIDER_CAPABILITIES[provider];
+    const limit = limits[provider]?.monthlyTokenBudget ?? null;
+    return {
+      provider,
+      label: cap?.label ?? provider,
+      periodLabel: label,
+      tokenInput: null,
+      tokenOutput: null,
+      tokensUsed: null,
+      monthlyLimit: limit,
+      remaining: limit,
+      tokensFromTelemetry: false,
+      limitConfigured: limit != null && limit > 0,
+    };
+  });
 }
 
 export async function employeeAiSubscriptions(
+  organizationId: string,
+  developerId: string,
+): Promise<EmployeeAiSubscriptionRow[]> {
+  try {
+    return await employeeAiSubscriptionsInner(organizationId, developerId);
+  } catch (err) {
+    console.error("[employeeAiSubscriptions]", err);
+    return fallbackEmployeeAiSubscriptions();
+  }
+}
+
+async function employeeAiSubscriptionsInner(
   organizationId: string,
   developerId: string,
 ): Promise<EmployeeAiSubscriptionRow[]> {

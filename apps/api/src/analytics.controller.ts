@@ -69,6 +69,16 @@ function assertCanViewPeople(user: AuthUser): void {
   }
 }
 
+/** Optional analytics — must not break the employee page if a query or migration lags. */
+async function safeAnalytics<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error(`[analytics] ${label}`, err);
+    return fallback;
+  }
+}
+
 @Controller("v1")
 @UseGuards(DashboardAuthGuard)
 export class AnalyticsController {
@@ -221,8 +231,8 @@ export class AnalyticsController {
         to: range.to,
         limit: 8,
       }),
-      workspaceFileChanges(scope, range),
-      fileChangeTrend(scope, range),
+      safeAnalytics("workspaceFileChanges", () => workspaceFileChanges(scope, range), []),
+      safeAnalytics("fileChangeTrend", () => fileChangeTrend(scope, range), []),
       employeeAiSubscriptions(user.organizationId, id),
     ]);
 
