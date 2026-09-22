@@ -74,4 +74,6 @@ pnpm dev:worker     # optional: hourly finalise, recalc, retention
 agent). Do not ask employees to clone this repo or run `pnpm dev:connector`.
 That script is only for maintainers working in this monorepo.
 
+**Live agent events:** on startup the connector installs Claude Code and Cursor hooks. They report tool and model timing only — not prompts, command text, or file contents. Dashboard health checks are not printed. Claude’s website chat is outside Claude Code and does not emit these events.
+
 **Backlog:** [pending.md](pending.md).

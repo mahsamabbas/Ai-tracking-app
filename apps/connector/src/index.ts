@@ -8,7 +8,9 @@ import {
   providerFromHostApp,
   type ActivityEvent,
 } from "@techlio/event-schema";
-import { claudeHookToEvents } from "@techlio/provider-adapters";
+import { claudeHookToEvents, type ClaudeHookPayload } from "@techlio/provider-adapters";
+import { createHash } from "node:crypto";
+import { ensureAgentHooks } from "./agent-hooks.js";
 import { config } from "./config.js";
 import {
   clearIdentity,
@@ -29,6 +31,45 @@ let contextLabel: string | undefined;
 let identity: ConnectorIdentity | null = loadIdentity();
 let activeSessionId: string | undefined = identity ? crypto.randomUUID() : undefined;
 let flushing = false;
+const modelStartedAt = new Map<string, number>();
+const toolStartedAt = new Map<string, number>();
+
+function note(message: string): void {
+  const clock = new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  console.log(`${clock}  ${message}`);
+}
+
+function asSessionId(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    return value;
+  }
+  const hash = createHash("sha256").update(value).digest("hex");
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
+
+function describeEvent(event: ActivityEvent): string {
+  const who = event.provider === "claude_code" ? "Claude Code" : event.provider === "cursor" ? "Cursor" : event.provider;
+  const where = event.metadata?.path_category ? ` · ${event.metadata.path_category}` : "";
+  const file = event.metadata?.file_path ? ` · ${event.metadata.file_path}` : "";
+  const tool = event.metadata?.tool_name ? ` · ${event.metadata.tool_name}` : "";
+  const seconds = event.duration_ms ? ` · ${Math.max(1, Math.round(event.duration_ms / 1000))}s` : "";
+  if (event.event_type === "model_request_started") return `${who} · model request started${where}`;
+  if (event.event_type === "model_request_completed") return `${who} · model request finished${seconds}${where}`;
+  if (event.event_type === "tool_started") return `${who} · tool started${tool}${where}`;
+  if (event.event_type === "tool_completed") return `${who} · tool finished${tool}${seconds}${file}`;
+  if (event.event_type === "file_modified" || event.event_type === "file_created" || event.event_type === "file_deleted") {
+    return `${who} · ${event.event_type.replace("file_", "file ")}${file}${where}`;
+  }
+  if (event.event_type === "session_started") return `${who} · session started${where}`;
+  if (event.event_type === "session_ended") return `${who} · session ended${where}`;
+  if (event.event_type === "session_heartbeat") return `${who} · session still open${where}`;
+  return `${who} · ${event.event_type.replaceAll("_", " ")}${where}`;
+}
 
 function defaultStatus(
   eventType: ActivityEvent["event_type"],
@@ -114,7 +155,13 @@ async function flushQueue(): Promise<void> {
       signingKey,
       batch,
     );
-    if (ok) queue.acknowledge(pending.rowIds);
+    if (ok) {
+      queue.acknowledge(pending.rowIds);
+      const agentEvents = batch.filter((event) => event.event_type !== "heartbeat_sent");
+      if (agentEvents.length) {
+        note(`uploaded ${agentEvents.length} event${agentEvents.length === 1 ? "" : "s"} to the dashboard`);
+      }
+    }
   } catch {
     // Keep the original queue rows for at-least-once delivery.
   } finally {
@@ -188,7 +235,7 @@ function dashboardOriginAllowed(origin: string): boolean {
   });
 }
 
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: false });
 
 app.addHook("onRequest", async (req, reply) => {
   const origin = req.headers.origin;
@@ -397,24 +444,95 @@ app.post("/hooks/extension", async (req) => {
   if (clean) {
     queue.enqueue([clean]);
     void flushQueue();
+    if (clean.event_type !== "session_heartbeat") note(describeEvent(clean));
     return { accepted: 1, provider: hostProvider };
   }
   return { accepted: 0 };
 });
 
-app.post("/hooks/claude", async (req) => {
-  if (paused) return { accepted: 0 };
-  if (!identity) return { accepted: 0, unpaired: true };
+function measuredDuration(
+  kind: "model" | "tool",
+  provider: string,
+  sessionId: string | undefined,
+  toolName: string | undefined,
+): number | undefined {
+  const map = kind === "model" ? modelStartedAt : toolStartedAt;
+  const specific = `${provider}:${sessionId ?? "default"}:${kind === "tool" ? toolName ?? "tool" : "model"}`;
+  const fallback = `${provider}:default:${kind === "tool" ? toolName ?? "tool" : "model"}`;
+  const started = map.get(specific) ?? map.get(fallback);
+  map.delete(specific);
+  map.delete(fallback);
+  if (!started) return undefined;
+  return Math.max(1, Date.now() - started);
+}
+
+function rememberStart(
+  kind: "model" | "tool",
+  provider: string,
+  sessionId: string | undefined,
+  toolName: string | undefined,
+): void {
+  const key = `${provider}:${sessionId ?? "default"}:${kind === "tool" ? toolName ?? "tool" : "model"}`;
+  (kind === "model" ? modelStartedAt : toolStartedAt).set(key, Date.now());
+}
+
+const recentAgentEvents = new Map<string, number>();
+
+function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
+  if (paused || !identity) return { accepted: 0, unpaired: !identity };
+  const provider = payload.provider === "cursor" || payload.provider === "claude_code" || payload.provider === "vscode"
+    ? payload.provider
+    : fallbackProvider;
+  const sessionId = asSessionId(payload.session_id ?? payload.conversation_id);
+  if (payload.hook_event_name === "model_request_started" || payload.hook_event_name === "UserPromptSubmit" || payload.hook_event_name === "beforeSubmitPrompt") {
+    rememberStart("model", provider, sessionId, undefined);
+  }
+  if (payload.hook_event_name === "tool_started" || payload.hook_event_name === "PreToolUse" || payload.hook_event_name === "preToolUse") {
+    rememberStart("tool", provider, sessionId, payload.tool_name ?? payload.tool);
+  }
   const events = claudeHookToEvents(
-    req.body as Record<string, unknown>,
-    connectorCtx("claude_code"),
-  );
+    { ...payload, session_id: sessionId, provider },
+    connectorCtx(provider),
+  ).map((event) => {
+    if (event.duration_ms || (event.event_type !== "model_request_completed" && event.event_type !== "tool_completed")) {
+      return event;
+    }
+    const duration = measuredDuration(
+      event.event_type === "model_request_completed" ? "model" : "tool",
+      provider,
+      sessionId,
+      event.metadata?.tool_name,
+    );
+    return duration ? { ...event, duration_ms: duration } : event;
+  });
   const clean = events
     .map(sanitizeEvent)
-    .filter((e): e is NonNullable<typeof e> => e !== null);
-  if (clean.length) queue.enqueue(clean);
+    .filter((event): event is NonNullable<typeof event> => event !== null);
+  if (!clean.length) return { accepted: 0, provider };
+  const fresh = clean.filter((event) => {
+    const key = `${event.event_type}:${event.metadata?.tool_name ?? ""}:${event.metadata?.file_path ?? ""}`;
+    const seen = recentAgentEvents.get(key) ?? 0;
+    if (Date.now() - seen < 2_000) return false;
+    recentAgentEvents.set(key, Date.now());
+    return true;
+  });
+  if (!fresh.length) return { accepted: 0, provider, duplicate: true };
+  if (sessionId) activeSessionId = sessionId;
+  const workspace = fresh.find((event) => event.metadata?.path_category)?.metadata?.path_category;
+  if (workspace) contextLabel = workspace;
+  queue.enqueue(fresh);
   void flushQueue();
-  return { accepted: clean.length };
+  for (const event of fresh) note(describeEvent(event));
+  return { accepted: fresh.length, provider };
+}
+
+app.post("/hooks/agent", async (req) => {
+  return acceptAgentHook((req.body ?? {}) as ClaudeHookPayload, "claude_code");
+});
+
+app.post("/hooks/claude", async (req) => {
+  const body = (req.body ?? {}) as ClaudeHookPayload;
+  return acceptAgentHook({ ...body, provider: "claude_code" }, "claude_code");
 });
 
 const rejectUnavailableOtlp = async (
@@ -454,7 +572,11 @@ app
       );
     }
     console.log("Techlio connector is running at http://127.0.0.1:9477");
-    console.log("Return to the dashboard and click Check if running.");
+    const hooks = ensureAgentHooks();
+    console.log("Dashboard pings are hidden. Agent events print below as they happen.");
+    if (hooks.claude) console.log("Claude Code hooks are installed. Restart Claude Code if it is already open.");
+    if (hooks.cursor) console.log("Cursor agent hooks are installed. Cursor reloads them automatically.");
+    console.log("The Claude website chat is not Claude Code, so that chat stays off this log until it runs in Claude Code.");
   })
   .catch((err) => {
     console.error(err);
