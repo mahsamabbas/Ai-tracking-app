@@ -128,6 +128,8 @@ export function AppShell({
     if (onboardingLocked) {
       const allowed = new Set(["/setup-connector", "/my-connectors", "/policy"]);
       items = items.filter((item) => allowed.has(item.href));
+    } else {
+      items = items.filter((item) => item.href !== "/setup-connector");
     }
     return items;
   }, [user, onboardingLocked]);
@@ -178,7 +180,7 @@ export function AppShell({
                     : undefined
               }
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
                 onboardingLocked && item.href === "/setup-connector" && !active
                   ? "bg-amber-50 text-amber-900 ring-1 ring-amber-300 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-700"
                   : ""
@@ -188,10 +190,10 @@ export function AppShell({
                   : "text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/5"
               }`}
             >
-              <span className={active ? "text-brand-600" : "text-ink-400"}>{item.icon}</span>
-              <span className="min-w-0 flex-1">{item.label}</span>
+              <span className={`shrink-0 ${active ? "text-brand-600" : "text-ink-400"}`}>{item.icon}</span>
+              <span className="min-w-0 flex-1 truncate whitespace-nowrap">{item.label}</span>
               {onboardingLocked && item.href === "/setup-connector" ? (
-                <span className="shrink-0 rounded bg-amber-200/80 px-1.5 py-0.5 text-2xs font-semibold text-amber-950 dark:bg-amber-800 dark:text-amber-50">
+                <span className="shrink-0 whitespace-nowrap rounded bg-amber-200/80 px-1.5 py-0.5 text-2xs font-semibold text-amber-950 dark:bg-amber-800 dark:text-amber-50">
                   Start here
                 </span>
               ) : null}

@@ -117,7 +117,7 @@ function connectIdes(): void {
   }
 }
 
-export function installBackgroundService(): void {
+export async function installBackgroundService(): Promise<void> {
   const dir = installDir();
   mkdirSync(dir, { recursive: true });
   const dest = join(dir, exeName());
@@ -127,6 +127,7 @@ export function installBackgroundService(): void {
   if (platform() !== "win32") chmodSync(dest, 0o755);
   writeEnv(dir);
 
+  console.log("Installing Techlio connector…");
   if (platform() === "win32") {
     registerWindows(dest);
     const child = spawn(dest, ["--service"], {
@@ -151,7 +152,8 @@ export function installBackgroundService(): void {
   console.log("");
   console.log("Techlio connector is running in the background.");
   console.log("This computer: http://127.0.0.1:9477");
-  console.log("Go back to the dashboard → My connectors → activate your key.");
-  console.log("Cursor or VS Code was linked when that app's command was available.");
+  console.log("Go back to the dashboard, open My connectors, and activate your key.");
+  console.log("You can close this window.");
   console.log("");
+  await new Promise((resolve) => setTimeout(resolve, 8_000));
 }

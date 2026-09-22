@@ -174,7 +174,7 @@ export function TourSpotlight({
           {stepIndex > 0 ? (
             <button
               type="button"
-              className="btn-ghost h-8 border border-slate-600 text-xs text-slate-100 hover:bg-slate-700"
+              className="inline-flex h-8 items-center rounded-lg border border-slate-500 bg-slate-700 px-3 text-xs font-medium text-white hover:bg-slate-600"
               onClick={() => onStepIndexChange(stepIndex - 1)}
             >
               Back

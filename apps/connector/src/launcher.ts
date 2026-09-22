@@ -4,7 +4,7 @@
  * `tsx src/index.ts` during development is unchanged.
  */
 const execName = process.execPath.split(/[/\\]/).pop() ?? "";
-const packaged = execName.startsWith("techlio-connector");
+const packaged = /techlio-connector/i.test(execName);
 
 async function main(): Promise<void> {
   const service = process.argv.includes("--service") || !packaged;
@@ -13,7 +13,7 @@ async function main(): Promise<void> {
     return;
   }
   const { installBackgroundService } = await import("./install-service.js");
-  installBackgroundService();
+  await installBackgroundService();
 }
 
 main().catch((err) => {

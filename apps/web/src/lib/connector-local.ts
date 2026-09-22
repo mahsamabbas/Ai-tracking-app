@@ -69,3 +69,10 @@ export function detectConnectorPlatform(): "mac" | "windows" | "other" {
   if (/Mac|iPhone|iPad/i.test(ua)) return "mac";
   return "other";
 }
+
+export function detectMacChip(): "arm" | "intel" {
+  if (typeof navigator === "undefined") return "arm";
+  const ua = navigator.userAgent;
+  if (/Intel/i.test(ua)) return "intel";
+  return "arm";
+}

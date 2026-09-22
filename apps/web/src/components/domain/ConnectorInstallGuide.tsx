@@ -7,6 +7,7 @@ import {
   CONNECTOR_MAC_INTEL,
   CONNECTOR_WINDOWS_EXE,
   detectConnectorPlatform,
+  detectMacChip,
   useConnectorOnline,
   useConnectorSetupPhase,
 } from "@/lib/connector-local";
@@ -30,6 +31,11 @@ export function ConnectorInstallGuide() {
   const { online, refresh } = useConnectorOnline(5_000);
   const { phase } = useConnectorSetupPhase(4_000);
   const platform = detectConnectorPlatform();
+  const macChip = detectMacChip();
+  const macHref = macChip === "intel" ? CONNECTOR_MAC_INTEL : CONNECTOR_MAC_ARM;
+  const macLabel = macChip === "intel" ? "Download for Intel Mac" : "Download for Mac";
+  const otherMacHref = macChip === "intel" ? CONNECTOR_MAC_ARM : CONNECTOR_MAC_INTEL;
+  const otherMacLabel = macChip === "intel" ? "Apple silicon" : "Intel Mac";
   const step1Done = phase === "unpaired" || phase === "ready";
   const step3Done = phase === "ready";
 
@@ -40,21 +46,30 @@ export function ConnectorInstallGuide() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-ink-900">Install the local agent on this computer</p>
           <p className="mt-1 text-xs leading-relaxed text-ink-700">
-            Download one program and open it. It stays running in the background and links Cursor or
-            VS Code on this computer when those apps are installed. Each person does this on their
-            own machine.
+            The connector has to run on this computer so Cursor or VS Code can send activity. You
+            can start it with one command from the project, or download a program if you prefer.
           </p>
+          <div className="mt-3 rounded-lg border border-line bg-slate-50 p-3 dark:bg-white/5">
+            <p className="text-xs font-semibold text-ink-900">Start from the project (simplest)</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-700">
+              In a terminal, from the Techlio folder, run this and leave the window open:
+            </p>
+            <pre className="code-snippet mt-2">pnpm dev:connector</pre>
+            <p className="mt-2 text-xs leading-relaxed text-ink-700">
+              Then come back here and click Check if running.
+            </p>
+          </div>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <a
-              href={platform === "windows" ? CONNECTOR_WINDOWS_EXE : CONNECTOR_MAC_ARM}
+              href={platform === "windows" ? CONNECTOR_WINDOWS_EXE : macHref}
               download
-              className="btn-primary inline-flex h-9 items-center whitespace-nowrap px-3 text-xs"
+              className="btn-ghost inline-flex h-9 items-center whitespace-nowrap px-3 text-xs"
             >
-              {platform === "windows" ? "Download for Windows" : "Download for Mac"}
+              {platform === "windows" ? "Download for Windows" : macLabel}
             </a>
             {platform === "mac" ? (
-              <a href={CONNECTOR_MAC_INTEL} download className="btn-ghost h-9 whitespace-nowrap text-xs">
-                Intel Mac
+              <a href={otherMacHref} download className="btn-ghost h-9 whitespace-nowrap text-xs">
+                {otherMacLabel}
               </a>
             ) : null}
             <button type="button" className="btn-ghost h-9 whitespace-nowrap text-xs" onClick={() => void refresh()}>
@@ -63,8 +78,8 @@ export function ConnectorInstallGuide() {
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink-700">
             {platform === "windows"
-              ? "Open the downloaded program. If Windows shows a warning, choose More info, then Run anyway."
-              : "Open the downloaded program. If macOS blocks it, right-click the file and choose Open."}
+              ? "If you use the Windows program, keep the black window open. If Windows warns you, choose More info, then Run anyway."
+              : "If you download a Mac program, do not open it in Terminal. Double-click it in Finder. If macOS blocks it, right-click the file and choose Open."}
           </p>
           {online === false ? (
             <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
