@@ -23,19 +23,11 @@ pnpm --filter @techlio/server-core run build
 
 echo "==> 2/4  Database migrations"
 if [[ "${SKIP_DB_MIGRATE:-}" == "1" ]]; then
-  echo "SKIP_DB_MIGRATE=1 — skipping migrations (run pnpm db:migrate separately with production DATABASE_URL)."
-elif [[ "${DATABASE_URL:-}" == *"@HOST"* ]] || [[ "${DATABASE_URL:-}" == *"USER:PASS"* ]]; then
-  echo "ERROR: DATABASE_URL still looks like the documentation placeholder (USER/PASS/HOST)."
-  echo "Use your real Postgres URL, for example:"
-  echo "  cd apps/api && vercel link --project tracking-app-api --yes"
-  echo "  vercel env pull .env.production.local --environment=production --yes"
-  echo "  export \$(grep -E '^DATABASE_URL=' .env.production.local | head -1)"
-  echo "Or set SKIP_DB_MIGRATE=1 to deploy without migrating."
-  exit 1
-elif [[ -z "${DATABASE_URL:-}${POSTGRES_URL:-}${DATABASE_URL_UNPOOLED:-}" ]]; then
-  echo "WARN: DATABASE_URL not set — migrating local default (postgres://techlio:techlio@localhost:5432/techlio_activity)"
+  echo "SKIP_DB_MIGRATE=1 — skipping migrations."
+else
+  unset DATABASE_URL POSTGRES_URL DATABASE_URL_UNPOOLED POSTGRES_URL_NON_POOLING 2>/dev/null || true
+  bash "$ROOT/scripts/migrate-prod.sh"
 fi
-pnpm db:migrate
 
 if [[ "$WITH_CONNECTOR" == "1" ]]; then
   echo "==> 3/5  Pack connector (DMG/exe)"
