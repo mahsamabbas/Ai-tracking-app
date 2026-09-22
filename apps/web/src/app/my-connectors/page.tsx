@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
@@ -104,7 +105,7 @@ export default function MyConnectorsPage() {
         </Card>
         </div>
 
-        <Card className="xl:col-span-2">
+        <Card className="card-table xl:col-span-2">
           <CardHeader
             title="Keys assigned to you"
             subtitle={
@@ -130,7 +131,7 @@ export default function MyConnectorsPage() {
           ) : live.loading ? (
             <LoadingBlock rows={5} />
           ) : (
-            <div className="table-scroll">
+            <TableScroll>
               <table className="tbl min-w-[520px]">
                 <thead>
                   <tr>
@@ -180,7 +181,7 @@ export default function MyConnectorsPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </Card>
       </div>

@@ -26,6 +26,7 @@ import { DurationSplit } from "@/components/domain/DurationSplit";
 import { SessionTable } from "@/components/domain/SessionTable";
 import { ToolCard } from "@/components/domain/ToolCard";
 import { ProjectsFileChangesCard } from "@/components/domain/ProjectsFileChangesCard";
+import { EmployeeAiPlanUsage } from "@/components/domain/EmployeeAiPlanUsage";
 import { EventTimeline } from "@/components/domain/EventTimeline";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { RangePicker, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
@@ -293,6 +294,10 @@ export default function EmployeeDetailPage() {
               previous={d.previousTotals.idleMs}
               help="Gaps over the idle threshold inside sessions. The person may have been working without the agent."
             />
+          </section>
+
+          <section className="mt-5">
+            <EmployeeAiPlanUsage rows={d.aiSubscriptions ?? []} isSelf={isSelf} />
           </section>
 
           {/* ---------------- Trend + split ---------------- */}

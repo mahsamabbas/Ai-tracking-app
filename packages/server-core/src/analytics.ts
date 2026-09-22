@@ -501,6 +501,8 @@ export interface ToolUsage {
   employees: number;
   modelRequests: number;
   fileChanges: number;
+  tokenInput: number | null;
+  tokenOutput: number | null;
   lastUsedAt: string | null;
 }
 
@@ -517,6 +519,9 @@ export async function toolDistribution(
     employees: number;
     model_requests: string;
     file_changes: string;
+    token_input: string | null;
+    token_output: string | null;
+    sessions_with_tokens: number;
     last_used: Date | null;
   }>(sql`
     SELECT s.provider,
@@ -527,23 +532,34 @@ export async function toolDistribution(
            COUNT(DISTINCT s.developer_id)::int           AS employees,
            SUM(s.model_requests)                         AS model_requests,
            SUM(s.file_changes)                           AS file_changes,
+           SUM(s.token_input)                            AS token_input,
+           SUM(s.token_output)                           AS token_output,
+           COUNT(*) FILTER (WHERE s.token_input IS NOT NULL OR s.token_output IS NOT NULL)::int
+                                                         AS sessions_with_tokens,
            MAX(COALESCE(s.last_event_at, s.started_at))  AS last_used
     FROM agent_sessions s
     WHERE ${scopeWhere(f, range)}
     GROUP BY s.provider
     ORDER BY active_ms DESC
   `);
-  return res.rows.map((r) => ({
-    provider: r.provider,
-    activeMs: Number(r.active_ms ?? 0),
-    modelMs: Number(r.model_ms ?? 0),
-    toolMs: Number(r.tool_ms ?? 0),
-    sessions: r.sessions,
-    employees: r.employees,
-    modelRequests: Number(r.model_requests ?? 0),
-    fileChanges: Number(r.file_changes ?? 0),
-    lastUsedAt: r.last_used ? new Date(r.last_used).toISOString() : null,
-  }));
+  return res.rows.map((r) => {
+    const hasTokens = (r.sessions_with_tokens ?? 0) > 0;
+    const tokenInput = hasTokens ? Number(r.token_input ?? 0) : null;
+    const tokenOutput = hasTokens ? Number(r.token_output ?? 0) : null;
+    return {
+      provider: r.provider,
+      activeMs: Number(r.active_ms ?? 0),
+      modelMs: Number(r.model_ms ?? 0),
+      toolMs: Number(r.tool_ms ?? 0),
+      sessions: r.sessions,
+      employees: r.employees,
+      modelRequests: Number(r.model_requests ?? 0),
+      fileChanges: Number(r.file_changes ?? 0),
+      tokenInput,
+      tokenOutput,
+      lastUsedAt: r.last_used ? new Date(r.last_used).toISOString() : null,
+    };
+  });
 }
 
 export interface HourPattern {

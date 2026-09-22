@@ -53,7 +53,7 @@ export function ToolCard({
         </div>
       </div>
 
-      <dl className="grid grid-cols-3 gap-2 border-t border-line pt-3 text-xs">
+      <dl className="grid grid-cols-2 gap-2 border-t border-line pt-3 text-xs sm:grid-cols-4">
         <div>
           <dt className="hint">Model calls</dt>
           <dd className="num font-medium text-ink-900">{formatNumber(tool.modelRequests)}</dd>
@@ -61,6 +61,14 @@ export function ToolCard({
         <div>
           <dt className="hint">File changes</dt>
           <dd className="num font-medium text-ink-900">{formatNumber(tool.fileChanges)}</dd>
+        </div>
+        <div>
+          <dt className="hint">Tokens (range)</dt>
+          <dd className="num font-medium text-ink-900">
+            {tool.tokenInput == null
+              ? "—"
+              : `${formatNumber(tool.tokenInput)} / ${formatNumber(tool.tokenOutput ?? 0)}`}
+          </dd>
         </div>
         <div>
           <dt className="hint">Avg session</dt>

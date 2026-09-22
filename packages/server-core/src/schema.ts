@@ -15,6 +15,7 @@ export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey(),
   name: text("name").notNull(),
   timezone: text("timezone").notNull().default("UTC"),
+  aiPlanLimits: jsonb("ai_plan_limits"),
 });
 
 /** The monitored people. `id` is the developer_id carried on every event. */

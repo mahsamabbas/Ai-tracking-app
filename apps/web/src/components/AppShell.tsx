@@ -238,7 +238,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-[100dvh] bg-canvas">
-      <aside className="sticky top-0 hidden h-[100dvh] w-[232px] shrink-0 flex-col overflow-hidden border-r border-line bg-card lg:flex">
+      <aside className="sticky top-0 hidden h-[100dvh] w-[232px] shrink-0 flex flex-col overflow-hidden border-r border-line bg-card lg:flex">
         {sidebarInner}
       </aside>
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState, ErrorState, LoadingBlock, StatSkeleton } from "@/components/ui/States";
 import { Sparkline } from "@/components/charts/Sparkline";
@@ -177,7 +178,7 @@ export default function EmployeesPage() {
       )}
 
       <div className="mt-5">
-        <Card>
+        <Card className="card-table">
           <CardHeader
             title="Directory"
             subtitle="Click a row to open that employee's analytics"
@@ -205,7 +206,7 @@ export default function EmployeesPage() {
               }
             />
           ) : (
-            <div className="table-scroll">
+            <TableScroll>
               <table className="tbl min-w-[960px]">
                 <thead>
                   <tr>
@@ -319,7 +320,7 @@ export default function EmployeesPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </Card>
       </div>

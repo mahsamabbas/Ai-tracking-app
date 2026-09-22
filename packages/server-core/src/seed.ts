@@ -197,8 +197,19 @@ export async function seedDemoOrganization(options?: {
   await db.execute(sql`DELETE FROM employees WHERE organization_id = ${orgId}`);
 
   await db.execute(sql`
-    INSERT INTO organizations (id, name, timezone) VALUES (${orgId}, 'Techlio', 'UTC')
-    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+    INSERT INTO organizations (id, name, timezone, ai_plan_limits)
+    VALUES (
+      ${orgId},
+      'Techlio',
+      'UTC',
+      ${JSON.stringify({
+        cursor: { monthlyTokenBudget: 5_000_000 },
+        claude_code: { monthlyTokenBudget: 2_000_000 },
+      })}::jsonb
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      name = EXCLUDED.name,
+      ai_plan_limits = COALESCE(organizations.ai_plan_limits, EXCLUDED.ai_plan_limits)
   `);
 
   // --- projects & work items ------------------------------------------------

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { StatTile } from "@/components/ui/StatTile";
 import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock, StatSkeleton } from "@/components/ui/States";
@@ -124,7 +125,7 @@ export default function ConnectorsPage() {
         </FilterBar>
       </div>
 
-      <Card>
+      <Card className="card-table">
         <CardHeader
           title="Registered connectors"
           subtitle="One credential per employee, device, and AI tool"
@@ -136,7 +137,7 @@ export default function ConnectorsPage() {
         ) : rows.length === 0 ? (
           <EmptyState variant={all.length === 0 ? "connector-offline" : "no-results"} />
         ) : (
-          <div className="table-scroll">
+          <TableScroll>
             <table className="tbl min-w-[720px]">
               <thead>
                 <tr>
@@ -196,7 +197,7 @@ export default function ConnectorsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </Card>
 

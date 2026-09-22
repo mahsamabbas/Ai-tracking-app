@@ -199,7 +199,11 @@
     @apply max-h-[min(18rem,50vh)] overflow-y-auto overscroll-y-contain;
   }
   .table-scroll {
-    @apply max-h-[min(32rem,72vh)] overflow-auto overscroll-contain;
+    @apply max-h-[min(24rem,52vh)] overflow-x-auto overflow-y-auto overscroll-y-contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .card-table {
+    @apply flex min-h-0 flex-col overflow-hidden;
   }
   .table-scroll .tbl thead th {
     @apply sticky top-0 z-10 shadow-[0_1px_0_0_var(--line)];

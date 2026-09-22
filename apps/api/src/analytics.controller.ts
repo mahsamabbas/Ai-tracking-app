@@ -37,6 +37,7 @@ import {
   weekdayPattern,
   workspaceFileChanges,
   fileChangeTrend,
+  employeeAiSubscriptions,
   type AuthUser,
   type DateRange,
 } from "@techlio/server-core";
@@ -199,6 +200,7 @@ export class AnalyticsController {
       recent,
       fileChangeWorkspaces,
       fileChangeTrendSeries,
+      aiSubscriptions,
     ] = await Promise.all([
       activityTotals(scope, range),
       activityTotals(scope, prev),
@@ -221,6 +223,7 @@ export class AnalyticsController {
       }),
       workspaceFileChanges(scope, range),
       fileChangeTrend(scope, range),
+      employeeAiSubscriptions(user.organizationId, id),
     ]);
 
     return {
@@ -240,6 +243,7 @@ export class AnalyticsController {
       projects: projectUsage,
       fileChangeWorkspaces,
       fileChangeTrend: fileChangeTrendSeries,
+      aiSubscriptions,
       idlePeriods: gaps,
       recentSessions: recent.sessions,
       totalSessions: recent.total,

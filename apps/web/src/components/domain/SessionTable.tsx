@@ -25,7 +25,11 @@ export function SessionTable({
   }
 
   return (
-    <div className={sessions.length > 8 ? "table-scroll" : "overflow-x-auto"}>
+    <div
+      className={
+        sessions.length > 6 ? "table-scroll min-h-0 overflow-x-auto" : "overflow-x-auto"
+      }
+    >
       <table className="tbl min-w-[720px]">
         <thead>
           <tr>

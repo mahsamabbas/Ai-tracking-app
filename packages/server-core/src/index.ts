@@ -8,6 +8,7 @@ export * from "./devices.js";
 export * from "./sessionize.js";
 export * from "./sessions.js";
 export * from "./analytics.js";
+export * from "./ai-plan.js";
 export * from "./exports.js";
 export * from "./snapshots.js";
 export * from "./retention.js";

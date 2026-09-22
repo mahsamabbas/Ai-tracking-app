@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { FilterBar, SearchFilter } from "@/components/filters/FilterBar";
@@ -50,7 +51,7 @@ export default function AuditPage() {
         />
       </FilterBar>
 
-      <Card>
+      <Card className="card-table">
         <CardHeader
           title="Events"
           subtitle={`${entries.length} entries · newest first`}
@@ -70,7 +71,7 @@ export default function AuditPage() {
         ) : entries.length === 0 ? (
           <EmptyState variant={search ? "no-results" : "no-activity"} />
         ) : (
-          <div className="table-scroll">
+          <TableScroll>
             <table className="tbl min-w-[640px]">
               <thead>
                 <tr>
@@ -101,7 +102,7 @@ export default function AuditPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </Card>
     </AppShell>

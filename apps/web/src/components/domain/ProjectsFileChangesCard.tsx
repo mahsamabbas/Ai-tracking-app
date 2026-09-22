@@ -77,8 +77,9 @@ export function ProjectsFileChangesCard({
           </div>
         </CardBody>
         <div className="flex min-h-[280px] flex-col border-t border-line xl:border-l xl:border-t-0">
-          <CardBody className="flex flex-1 flex-col">
+          <CardBody className="flex min-h-0 flex-1 flex-col">
             <p className="label mb-3">Workspaces</p>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1">
             <BarList
               emptyLabel="No workspace file changes in this period"
               items={workspaces.map((p) => ({
@@ -94,6 +95,7 @@ export function ProjectsFileChangesCard({
                 color: "var(--chart-2)",
               }))}
             />
+            </div>
           </CardBody>
         </div>
       </div>

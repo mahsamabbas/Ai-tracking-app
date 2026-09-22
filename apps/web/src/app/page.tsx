@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { StatTile } from "@/components/ui/StatTile";
 import { Callout } from "@/components/ui/Callout";
 import {
@@ -525,13 +526,13 @@ export default function OverviewPage() {
           {/* ---------------- Connector table ---------------- */}
           {canViewTeam(user?.role) && (live.data?.connectors.length ?? 0) > 0 ? (
             <section className="mt-5">
-              <Card>
+              <Card className="card-table">
                 <CardHeader
                   title="Connectors"
                   subtitle="One registered installation per employee and AI tool"
                   href="/connectors"
                 />
-                <div className="table-scroll">
+                <TableScroll>
                   <table className="tbl min-w-[640px]">
                     <thead>
                       <tr>
@@ -574,7 +575,7 @@ export default function OverviewPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </TableScroll>
               </Card>
             </section>
           ) : null}

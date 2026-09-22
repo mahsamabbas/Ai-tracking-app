@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { TableScroll } from "@/components/ui/TableScroll";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
@@ -320,7 +321,7 @@ export default function UsersPage() {
           </CardBody>
         </Card>
 
-        <Card className="xl:col-span-2">
+        <Card className="card-table xl:col-span-2">
           <CardHeader
             title="Members"
             subtitle={`${users.length} in this organisation · ${developers.length} monitored`}
@@ -342,8 +343,8 @@ export default function UsersPage() {
           ) : users.length === 0 ? (
             <EmptyState variant="no-results" />
           ) : (
-            <div className="table-scroll">
-              <table className="tbl min-w-[640px]">
+            <TableScroll>
+              <table className="tbl min-w-[720px]">
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -401,7 +402,7 @@ export default function UsersPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </Card>
       </div>

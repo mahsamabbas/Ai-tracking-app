@@ -40,7 +40,22 @@ export interface ToolUsage {
   employees: number;
   modelRequests: number;
   fileChanges: number;
+  tokenInput: number | null;
+  tokenOutput: number | null;
   lastUsedAt: string | null;
+}
+
+export interface EmployeeAiSubscription {
+  provider: string;
+  label: string;
+  periodLabel: string;
+  tokenInput: number | null;
+  tokenOutput: number | null;
+  tokensUsed: number | null;
+  monthlyLimit: number | null;
+  remaining: number | null;
+  tokensFromTelemetry: boolean;
+  limitConfigured: boolean;
 }
 
 export interface HourPattern {
@@ -210,6 +225,7 @@ export interface EmployeeAnalytics {
     activeMs: number;
   }[];
   fileChangeTrend: { date: string; fileChanges: number }[];
+  aiSubscriptions?: EmployeeAiSubscription[];
   idlePeriods: IdlePeriod[];
   recentSessions: SessionRow[];
   totalSessions: number;
