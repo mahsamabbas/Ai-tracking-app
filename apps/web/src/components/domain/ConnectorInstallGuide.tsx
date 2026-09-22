@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import {
-  CONNECTOR_INSTALL_SCRIPT_PATH,
-  CONNECTOR_INSTALL_SCRIPT_WINDOWS,
-  connectorInstallCommand,
+  CONNECTOR_MAC_ARM,
+  CONNECTOR_MAC_INTEL,
+  CONNECTOR_WINDOWS_EXE,
   detectConnectorPlatform,
   useConnectorOnline,
   useConnectorSetupPhase,
@@ -31,20 +30,6 @@ export function ConnectorInstallGuide() {
   const { online, refresh } = useConnectorOnline(5_000);
   const { phase } = useConnectorSetupPhase(4_000);
   const platform = detectConnectorPlatform();
-  const [copied, setCopied] = useState(false);
-
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const installCmd = useMemo(
-    () => connectorInstallCommand(origin, platform === "windows" ? "windows" : "mac"),
-    [origin, platform],
-  );
-
-  async function copyCommand() {
-    await navigator.clipboard.writeText(installCmd);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   const step1Done = phase === "unpaired" || phase === "ready";
   const step3Done = phase === "ready";
 
@@ -55,62 +40,32 @@ export function ConnectorInstallGuide() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-ink-900">Install the local agent on this computer</p>
           <p className="mt-1 text-xs leading-relaxed text-ink-700">
-            The dashboard runs in the cloud, but AI tools (Cursor, Claude) only talk to a small
-            program on <strong className="font-semibold text-ink-900">your</strong> Mac or PC. Each
-            teammate installs once on their own machine — your install does not track anyone else.
+            Download one program and open it. It stays running in the background and links Cursor or
+            VS Code on this computer when those apps are installed. Each person does this on their
+            own machine.
           </p>
-          {platform === "mac" || platform === "windows" ? (
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <a
-                href={
-                  platform === "windows"
-                    ? CONNECTOR_INSTALL_SCRIPT_WINDOWS
-                    : CONNECTOR_INSTALL_SCRIPT_PATH
-                }
-                download={
-                  platform === "windows"
-                    ? "install-connector-windows.ps1"
-                    : "install-connector-macos.sh"
-                }
-                className="btn-primary h-9 whitespace-nowrap text-xs"
-              >
-                {platform === "windows" ? "Download Windows installer" : "Download macOS installer"}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <a
+              href={platform === "windows" ? CONNECTOR_WINDOWS_EXE : CONNECTOR_MAC_ARM}
+              download
+              className="btn-primary inline-flex h-9 items-center whitespace-nowrap px-3 text-xs"
+            >
+              {platform === "windows" ? "Download for Windows" : "Download for Mac"}
+            </a>
+            {platform === "mac" ? (
+              <a href={CONNECTOR_MAC_INTEL} download className="btn-ghost h-9 whitespace-nowrap text-xs">
+                Intel Mac
               </a>
-              <button
-                type="button"
-                className="btn-ghost h-9 whitespace-nowrap text-xs"
-                onClick={() => void copyCommand()}
-              >
-                {copied ? "Copied" : "Copy command"}
-              </button>
-              <button
-                type="button"
-                className="btn-ghost h-9 whitespace-nowrap text-xs"
-                onClick={() => void refresh()}
-              >
-                Check if running
-              </button>
-            </div>
-          ) : (
-            <p className="mt-2 text-xs leading-relaxed text-ink-700">
-              Use the Windows or macOS installer on this computer.
-            </p>
-          )}
-          {platform === "mac" || platform === "windows" ? (
-            <p className="mt-2 text-xs leading-relaxed text-ink-700">
-              You only need{" "}
-              <a
-                href="https://nodejs.org"
-                className="font-medium text-brand-700 underline dark:text-brand-300"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Node.js 20 or newer
-              </a>
-              . No Visual Studio, no project clone. The script installs the agent under your home
-              folder and starts it at sign-in.
-            </p>
-          ) : null}
+            ) : null}
+            <button type="button" className="btn-ghost h-9 whitespace-nowrap text-xs" onClick={() => void refresh()}>
+              Check if running
+            </button>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-ink-700">
+            {platform === "windows"
+              ? "Open the downloaded program. If Windows shows a warning, choose More info, then Run anyway."
+              : "Open the downloaded program. If macOS blocks it, right-click the file and choose Open."}
+          </p>
           {online === false ? (
             <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
               Not detected yet on 127.0.0.1:9477 — complete the install, then click “Check if running”.
@@ -121,12 +76,6 @@ export function ConnectorInstallGuide() {
               Local agent is running.
             </p>
           ) : null}
-          <div>
-            <p className="mt-3 text-2xs font-semibold uppercase tracking-wide text-ink-500">
-              Install command
-            </p>
-            <pre className="code-snippet">{installCmd}</pre>
-          </div>
         </div>
       </li>
 

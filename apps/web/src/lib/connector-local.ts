@@ -3,18 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 
 export const CONNECTOR_LOCAL = "http://127.0.0.1:9477";
-export const CONNECTOR_INSTALL_SCRIPT_PATH = "/install-connector-macos.sh";
-export const CONNECTOR_INSTALL_SCRIPT_WINDOWS = "/install-connector-windows.ps1";
+export const CONNECTOR_WINDOWS_EXE = "/downloads/techlio-connector-win-x64.exe";
+export const CONNECTOR_MAC_ARM = "/downloads/techlio-connector-macos-arm64";
+export const CONNECTOR_MAC_INTEL = "/downloads/techlio-connector-macos-x64";
 
-export function connectorInstallCommand(
-  origin: string,
-  platform: "mac" | "windows" | "other" = "mac",
-): string {
-  const base = origin.replace(/\/$/, "");
-  if (platform === "windows") {
-    return `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm '${base}${CONNECTOR_INSTALL_SCRIPT_WINDOWS}' | iex"`;
-  }
-  return `curl -fsSL ${base}${CONNECTOR_INSTALL_SCRIPT_PATH} | bash`;
+export function connectorDownloadPath(platform: "mac" | "windows" | "other"): string {
+  if (platform === "windows") return CONNECTOR_WINDOWS_EXE;
+  return CONNECTOR_MAC_ARM;
 }
 
 export async function fetchConnectorHealth(): Promise<boolean> {
