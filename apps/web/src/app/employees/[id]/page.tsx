@@ -502,8 +502,12 @@ export default function EmployeeDetailPage() {
                   body="Hourly cards appear after the worker finalises a completed hour. The current hour stays open until it closes."
                 />
               ) : (
-                <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
-                  {timeline.data!.hourlyCards.slice(0, 12).map((card) => (
+                <div
+                  className={`grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3 ${
+                    timeline.data!.hourlyCards.length > 6 ? "scroll-y pr-1" : ""
+                  }`}
+                >
+                  {timeline.data!.hourlyCards.map((card) => (
                     <Link
                       key={card.id}
                       href={`/hourly/${card.id}`}
@@ -545,7 +549,7 @@ export default function EmployeeDetailPage() {
                   body="Agent activity in this period had no break longer than the 10-minute idle threshold."
                 />
               ) : (
-                <ul className="divide-y divide-line">
+                <ul className={`divide-y divide-line ${d.idlePeriods.length > 6 ? "scroll-y-sm" : ""}`}>
                   {d.idlePeriods.map((g) => (
                     <li key={g.from} className="flex items-center gap-3 px-5 py-2.5">
                       <span
@@ -582,7 +586,7 @@ export default function EmployeeDetailPage() {
               <CardBody className="pt-1">
                 <EventTimeline
                   events={recentEvents}
-                  limit={10}
+                  limit={80}
                   emptyBody="Connector heartbeats are hidden here. Saves, edits, and sessions from any Cursor window with the Techlio companion will appear — chat-only Cursor use is not sent by the IDE."
                 />
               </CardBody>

@@ -130,8 +130,8 @@ export default function MyConnectorsPage() {
           ) : live.loading ? (
             <LoadingBlock rows={5} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="tbl">
+            <div className="table-scroll">
+              <table className="tbl min-w-[520px]">
                 <thead>
                   <tr>
                     <th>Name</th>

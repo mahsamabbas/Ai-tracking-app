@@ -460,8 +460,12 @@ export default function OverviewPage() {
                   body="No agent session has reported activity in the last 24 hours."
                 />
               ) : (
-                <ul className="divide-y divide-line">
-                  {live.data!.activeSessions.slice(0, 6).map((s) => (
+                <ul
+                  className={`divide-y divide-line ${
+                    (live.data?.activeSessions.length ?? 0) > 6 ? "scroll-y-sm" : ""
+                  }`}
+                >
+                  {live.data!.activeSessions.map((s) => (
                     <li key={s.sessionId} className="flex items-center gap-3 px-5 py-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -527,8 +531,8 @@ export default function OverviewPage() {
                   subtitle="One registered installation per employee and AI tool"
                   href="/connectors"
                 />
-                <div className="overflow-x-auto">
-                  <table className="tbl">
+                <div className="table-scroll">
+                  <table className="tbl min-w-[640px]">
                     <thead>
                       <tr>
                         <th>Employee</th>
@@ -540,7 +544,7 @@ export default function OverviewPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {live.data!.connectors.slice(0, 8).map((c) => (
+                      {live.data!.connectors.map((c) => (
                         <tr key={c.deviceId}>
                           <td>
                             <Link

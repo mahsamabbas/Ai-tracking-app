@@ -16,7 +16,7 @@ const TONE: Record<string, string> = {
 };
 
 /** FR-027 — health and data-quality notices, never activity judgements. */
-export function AlertList({ alerts, limit = 6 }: { alerts: AlertItem[]; limit?: number }) {
+export function AlertList({ alerts, limit }: { alerts: AlertItem[]; limit?: number }) {
   if (alerts.length === 0) {
     return (
       <EmptyState
@@ -26,9 +26,10 @@ export function AlertList({ alerts, limit = 6 }: { alerts: AlertItem[]; limit?: 
       />
     );
   }
+  const rows = limit != null ? alerts.slice(0, limit) : alerts;
   return (
-    <ul className="divide-y divide-line">
-      {alerts.slice(0, limit).map((a, i) => (
+    <ul className={`divide-y divide-line ${rows.length > 5 ? "scroll-y-sm" : ""}`}>
+      {rows.map((a, i) => (
         <li key={`${a.code}-${i}`} className="flex items-start gap-3 px-5 py-3">
           <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${TONE[a.severity]}`} />
           <div className="min-w-0 flex-1">

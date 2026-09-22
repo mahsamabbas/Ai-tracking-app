@@ -24,16 +24,19 @@ export function EventTimeline({
   events,
   limit,
   emptyBody,
+  scroll = true,
 }: {
   events: ActivityEventRow[];
   limit?: number;
   emptyBody?: string;
+  /** Vertical scroll when the list is long (default on). */
+  scroll?: boolean;
 }) {
   const shown = limit ? events.slice(0, limit) : events;
   if (shown.length === 0) {
     return <EmptyState compact variant="no-activity" body={emptyBody} />;
   }
-  return (
+  const list = (
     <ol className="relative space-y-0">
       {shown.map((e, i) => {
         const type = e.activity_type ?? "connector";
@@ -73,4 +76,6 @@ export function EventTimeline({
       })}
     </ol>
   );
+  if (!scroll || shown.length <= 6) return list;
+  return <div className="scroll-y pr-1">{list}</div>;
 }

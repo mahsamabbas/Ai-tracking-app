@@ -205,8 +205,8 @@ export default function EmployeesPage() {
               }
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="tbl">
+            <div className="table-scroll">
+              <table className="tbl min-w-[960px]">
                 <thead>
                   <tr>
                     <th>Employee</th>

@@ -324,7 +324,7 @@ export default function SessionDetailPage() {
                       {filteredEvents.length === 0 ? (
                         <EmptyState compact variant="no-results" />
                       ) : (
-                        <EventTimeline events={filteredEvents} limit={300} />
+                        <EventTimeline events={filteredEvents} limit={300} scroll={false} />
                       )}
                     </CardBody>
                   </>
@@ -428,7 +428,9 @@ export default function SessionDetailPage() {
                         }
                       />
                     ) : (
-                      <ol className="space-y-3">
+                      <ol
+                        className={`space-y-3 ${d.contextChanges.length > 8 ? "scroll-y-sm pr-1" : ""}`}
+                      >
                         {d.contextChanges.map((c) => (
                           <li key={c.version} className="flex gap-3">
                             <span className="badge-neutral shrink-0">v{c.version}</span>

@@ -77,7 +77,9 @@ export function DonutChart({
         ) : null}
       </div>
       {total > 0 ? (
-        <ul className="min-w-[140px] flex-1 space-y-1.5">
+        <ul
+          className={`min-w-[140px] flex-1 space-y-1.5 ${data.length > 8 ? "scroll-y-sm pr-1" : ""}`}
+        >
           {data.map((d, i) => (
             <li key={d.name} className="flex items-center gap-2 text-xs">
               <span

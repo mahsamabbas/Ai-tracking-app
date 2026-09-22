@@ -166,7 +166,7 @@ export function AppShell({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3" aria-label="Main">
+      <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-y-contain px-3" aria-label="Main">
         {nav.map((item) => {
           const active = isActive(path, item);
           return (
@@ -238,7 +238,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-[100dvh] bg-canvas">
-      <aside className="sticky top-0 hidden h-[100dvh] w-[232px] shrink-0 flex-col border-r border-line bg-card lg:flex">
+      <aside className="sticky top-0 hidden h-[100dvh] w-[232px] shrink-0 flex-col overflow-hidden border-r border-line bg-card lg:flex">
         {sidebarInner}
       </aside>
 
@@ -250,7 +250,7 @@ export function AppShell({
             className="absolute inset-0 bg-slate-950/40"
             onClick={() => setMenuOpen(false)}
           />
-          <aside className="absolute left-0 top-0 flex h-full w-[260px] flex-col bg-card shadow-pop">
+          <aside className="absolute left-0 top-0 flex h-full w-[260px] flex-col overflow-hidden bg-card shadow-pop">
             {sidebarInner}
           </aside>
         </div>

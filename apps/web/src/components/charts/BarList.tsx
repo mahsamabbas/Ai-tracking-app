@@ -19,7 +19,7 @@ export function BarList({ items, emptyLabel = "No data in this period" }: {
     return <p className="hint py-6 text-center">{emptyLabel}</p>;
   }
   return (
-    <ul className="space-y-2.5">
+    <ul className={`space-y-2.5 ${items.length > 8 ? "scroll-y-sm pr-1" : ""}`}>
       {items.map((item) => {
         const inner = (
           <>

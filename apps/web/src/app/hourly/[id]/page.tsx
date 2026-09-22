@@ -156,7 +156,7 @@ export default function HourlyDetailPage() {
                 subtitle="Late events create a new version; earlier snapshots are retained"
               />
               <CardBody>
-                <ul className="space-y-2">
+                <ul className={`space-y-2 ${d.versions.length > 6 ? "scroll-y-sm pr-1" : ""}`}>
                   {d.versions.map((v) => (
                     <li key={v.id} className="flex items-center gap-3 text-sm">
                       <Badge tone={v.id === d.snapshot.id ? "info" : "neutral"}>v{v.version}</Badge>
@@ -177,7 +177,7 @@ export default function HourlyDetailPage() {
               subtitle={`${d.sourceEvents.length} events in this clock hour`}
             />
             <CardBody className="max-h-[640px] overflow-y-auto pt-2">
-              <EventTimeline events={d.sourceEvents} limit={300} />
+              <EventTimeline events={d.sourceEvents} limit={300} scroll={false} />
             </CardBody>
           </Card>
         </>

@@ -342,8 +342,8 @@ export default function UsersPage() {
           ) : users.length === 0 ? (
             <EmptyState variant="no-results" />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="tbl">
+            <div className="table-scroll">
+              <table className="tbl min-w-[640px]">
                 <thead>
                   <tr>
                     <th>Name</th>

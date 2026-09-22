@@ -136,8 +136,8 @@ export default function ConnectorsPage() {
         ) : rows.length === 0 ? (
           <EmptyState variant={all.length === 0 ? "connector-offline" : "no-results"} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="tbl">
+          <div className="table-scroll">
+            <table className="tbl min-w-[720px]">
               <thead>
                 <tr>
                   <th>Employee</th>

@@ -70,8 +70,8 @@ export default function AuditPage() {
         ) : entries.length === 0 ? (
           <EmptyState variant={search ? "no-results" : "no-activity"} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="tbl">
+          <div className="table-scroll">
+            <table className="tbl min-w-[640px]">
               <thead>
                 <tr>
                   <th>When</th>
