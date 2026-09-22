@@ -35,8 +35,8 @@ export default function SetupConnectorPage() {
       <div className="mb-5 space-y-4" data-onboarding="onboard-welcome">
         <OnboardingStepper />
         <Callout tone="warn" title="Install the agent on this computer">
-          Open <strong>Install agent</strong> in the sidebar, run the command below once, then
-          activate your key on <strong>My connectors</strong>.
+          Download the connector below, open it once, then activate your key on{" "}
+          <strong>My connectors</strong>. You do not need the project repository.
         </Callout>
         <ThisComputerStatus />
         <ConnectorInstallGuide />

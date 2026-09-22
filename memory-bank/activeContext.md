@@ -70,4 +70,8 @@ pnpm dev            # API 3001, web 3000, connector 9477
 pnpm dev:worker     # optional: hourly finalise, recalc, retention
 ```
 
+**Employee connector:** download the program from the hosted dashboard (Install
+agent). Do not ask employees to clone this repo or run `pnpm dev:connector`.
+That script is only for maintainers working in this monorepo.
+
 **Backlog:** [pending.md](pending.md).

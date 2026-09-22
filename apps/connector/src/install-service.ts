@@ -1,4 +1,4 @@
-import { spawn, execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
   copyFileSync,
@@ -81,9 +81,11 @@ function registerMac(dest: string): void {
   } catch {
     /* not loaded yet */
   }
-  execFileSync("launchctl", ["bootstrap", domain, plist], { stdio: "ignore" });
-  execFileSync("launchctl", ["enable", `${domain}/${label}`], { stdio: "ignore" });
-  execFileSync("launchctl", ["kickstart", "-k", `${domain}/${label}`], { stdio: "ignore" });
+  try {
+    execFileSync("launchctl", ["enable", `${domain}/${label}`], { stdio: "ignore" });
+  } catch {
+    /* loaded automatically at next sign-in */
+  }
 }
 
 function which(cmd: string): boolean {
@@ -121,39 +123,16 @@ export async function installBackgroundService(): Promise<void> {
   const dir = installDir();
   mkdirSync(dir, { recursive: true });
   const dest = join(dir, exeName());
-  if (process.execPath !== dest) {
-    copyFileSync(process.execPath, dest);
+  try {
+    if (process.execPath !== dest) copyFileSync(process.execPath, dest);
+    if (platform() !== "win32") chmodSync(dest, 0o755);
+  } catch {
+    /* already running from the installed copy */
   }
-  if (platform() !== "win32") chmodSync(dest, 0o755);
   writeEnv(dir);
 
-  console.log("Installing Techlio connector…");
-  if (platform() === "win32") {
-    registerWindows(dest);
-    const child = spawn(dest, ["--service"], {
-      cwd: dir,
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true,
-    });
-    child.unref();
-  } else if (platform() === "darwin") {
-    registerMac(dest);
-  } else {
-    const child = spawn(dest, ["--service"], {
-      cwd: dir,
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-  }
+  console.log("Starting Techlio connector…");
+  if (platform() === "win32") registerWindows(dest);
+  else if (platform() === "darwin") registerMac(dest);
   connectIdes();
-
-  console.log("");
-  console.log("Techlio connector is running in the background.");
-  console.log("This computer: http://127.0.0.1:9477");
-  console.log("Go back to the dashboard, open My connectors, and activate your key.");
-  console.log("You can close this window.");
-  console.log("");
-  await new Promise((resolve) => setTimeout(resolve, 8_000));
 }

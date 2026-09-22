@@ -22,7 +22,7 @@ const STEPS: TourStep[] = [
     selector: '[data-onboarding="onboard-install"]',
     title: "Install the local agent",
     body:
-      "Download the installer or copy the command. It pulls the agent from Techlio, needs only Node.js, and keeps port 9477 running in the background.",
+      "Download the connector for this computer and open it. You do not need the project, Node.js, or pnpm. Then come back and click Check if running.",
     placement: "right",
     paths: ["/setup-connector"],
   },

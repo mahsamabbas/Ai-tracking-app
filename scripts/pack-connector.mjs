@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Builds downloadable connector executables (Windows and macOS).
- * Double-click installs a background service. No Node.js install required.
+ * Double-click starts the local connector. Employees never need this repo.
  */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
@@ -40,13 +40,7 @@ const targets = [
 for (const [target, name] of targets) {
   const compiled = spawnSync(
     "bun",
-    [
-      "build",
-      "--compile",
-      `--target=${target}`,
-      `--outfile=${join(downloads, name)}`,
-      bundle,
-    ],
+    ["build", "--compile", `--target=${target}`, `--outfile=${join(downloads, name)}`, bundle],
     { cwd: root, stdio: "inherit" },
   );
   if (compiled.status !== 0) {

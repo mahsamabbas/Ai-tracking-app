@@ -41,7 +41,7 @@ export async function claimLocalConnector(input: {
       ok: false,
       offline: true,
       message:
-        "This page could not reach the connector at 127.0.0.1:9477. Install the local agent from this site (Node.js only), then try again.",
+        "This page could not reach the connector at 127.0.0.1:9477. Download the connector from this site, open it, then try again.",
     };
   }
 }
@@ -98,8 +98,7 @@ export function ThisComputerStatus() {
   if (state.kind === "offline") {
     return (
       <Callout tone="warn" title="Connector not running on this computer">
-        Install the local agent from this page (Node.js only — no project download), then activate
-        your key.
+        Download the connector from this page, open it once, then activate your key.
       </Callout>
     );
   }

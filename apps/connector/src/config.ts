@@ -1,15 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 /** Optional local env for API URL / port — identity is claimed, not stored here. */
 function loadLocalEnv(): void {
   const candidates = [
     join(homedir(), ".techlio", "connector", ".env"),
-    join(dirname(fileURLToPath(import.meta.url)), "../.env"),
     join(process.cwd(), ".env"),
-    join(process.cwd(), "apps/connector/.env"),
   ];
   for (const envPath of candidates) {
     if (!existsSync(envPath)) continue;
@@ -36,10 +33,10 @@ loadLocalEnv();
 
 export const config = {
   port: Number(process.env.CONNECTOR_PORT ?? 9477),
-  apiBaseUrl: process.env.TECHLIO_API_URL ?? "http://localhost:3001",
+  apiBaseUrl: process.env.TECHLIO_API_URL ?? "https://tracking-app-api-three.vercel.app",
   consentVersion: process.env.TECHLIO_CONSENT_VERSION ?? "1",
   connectorVersion: "0.1.0",
   provider: process.env.TECHLIO_PROVIDER ?? "cursor",
-  dbPath: process.env.CONNECTOR_DB ?? ".techlio-connector/queue.db",
+  dbPath: process.env.CONNECTOR_DB ?? join(homedir(), ".techlio-connector", "queue.db"),
   signingKeyHex: process.env.CONNECTOR_SIGNING_KEY_HEX,
 };

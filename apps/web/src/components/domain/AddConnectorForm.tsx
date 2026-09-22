@@ -9,16 +9,16 @@ import { providerLabel } from "@/lib/providers";
 
 const SETUP: Record<string, string[]> = {
   cursor: [
-    "Keep the Techlio connector running (pnpm dev).",
-    "In Cursor: Extensions → Install from VSIX → Techlio companion (apps/extension).",
+    "Keep the Techlio connector running on this computer.",
+    "The connector connects Cursor automatically if it is installed. Restart Cursor if it was already open.",
   ],
   claude_code: [
     "Keep the Techlio connector running.",
     "Point Claude Code hooks at http://127.0.0.1:9477/hooks/claude",
   ],
   vscode: [
-    "Keep the Techlio connector running.",
-    "In VS Code: Extensions → Install from VSIX → Techlio companion.",
+    "Keep the Techlio connector running on this computer.",
+    "The connector connects VS Code automatically if it is installed. Restart VS Code if it was already open.",
   ],
   gemini: [
     "Gemini activation is unavailable until its normalized event adapter is implemented.",

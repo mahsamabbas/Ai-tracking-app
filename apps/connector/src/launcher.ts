@@ -1,19 +1,13 @@
 /**
- * Packaged executable entry.
- * Double-click installs a background service. `--service` runs the agent.
- * `tsx src/index.ts` during development is unchanged.
+ * Downloadable connector: start the agent immediately, then keep it running
+ * at sign-in. Developers never need the git repo or pnpm.
  */
-const execName = process.execPath.split(/[/\\]/).pop() ?? "";
-const packaged = /techlio-connector/i.test(execName);
-
 async function main(): Promise<void> {
-  const service = process.argv.includes("--service") || !packaged;
-  if (service) {
-    await import("./index.js");
-    return;
-  }
   const { installBackgroundService } = await import("./install-service.js");
-  await installBackgroundService();
+  if (!process.argv.includes("--service")) {
+    await installBackgroundService();
+  }
+  await import("./index.js");
 }
 
 main().catch((err) => {

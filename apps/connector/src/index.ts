@@ -173,7 +173,10 @@ const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 /** Localhost and TECHLIO_DASHBOARD_ORIGINS (comma-separated production dashboard URLs). */
 function dashboardOriginAllowed(origin: string): boolean {
   if (LOCAL_ORIGIN.test(origin)) return true;
-  const allowed = (process.env.TECHLIO_DASHBOARD_ORIGINS ?? "").split(",")
+  const allowed = (
+    process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://tracking-app-api-t9yd.vercel.app"
+  )
+    .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
   return allowed.some((pattern) => {
@@ -450,6 +453,8 @@ app
         "Connector unpaired — developer can add tools from My connectors in the portal",
       );
     }
+    console.log("Techlio connector is running at http://127.0.0.1:9477");
+    console.log("Return to the dashboard and click Check if running.");
   })
   .catch((err) => {
     console.error(err);

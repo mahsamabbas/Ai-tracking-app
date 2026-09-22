@@ -115,6 +115,7 @@ export function AppShell({
   const onboardingLocked = Boolean(
     user &&
       developerNeedsLocalConnector(user.role, user.developerId) &&
+      connectorPhase !== "loading" &&
       connectorPhase !== "ready",
   );
 

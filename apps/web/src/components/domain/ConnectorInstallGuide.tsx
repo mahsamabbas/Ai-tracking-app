@@ -44,26 +44,17 @@ export function ConnectorInstallGuide() {
       <li className="flex gap-3" data-onboarding="onboard-install">
         <StepBadge done={step1Done} n={1} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-ink-900">Install the local agent on this computer</p>
+          <p className="text-sm font-semibold text-ink-900">Download and run the connector</p>
           <p className="mt-1 text-xs leading-relaxed text-ink-700">
-            The connector has to run on this computer so Cursor or VS Code can send activity. You
-            can start it with one command from the project, or download a program if you prefer.
+            You do not need the Techlio project. Download the connector for this computer, open it
+            once, then come back here. It stays running and talks to Cursor or VS Code on this
+            machine.
           </p>
-          <div className="mt-3 rounded-lg border border-line bg-slate-50 p-3 dark:bg-white/5">
-            <p className="text-xs font-semibold text-ink-900">Start from the project (simplest)</p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-700">
-              In a terminal, from the Techlio folder, run this and leave the window open:
-            </p>
-            <pre className="code-snippet mt-2">pnpm dev:connector</pre>
-            <p className="mt-2 text-xs leading-relaxed text-ink-700">
-              Then come back here and click Check if running.
-            </p>
-          </div>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <a
               href={platform === "windows" ? CONNECTOR_WINDOWS_EXE : macHref}
               download
-              className="btn-ghost inline-flex h-9 items-center whitespace-nowrap px-3 text-xs"
+              className="btn-primary inline-flex h-9 items-center whitespace-nowrap px-3 text-xs"
             >
               {platform === "windows" ? "Download for Windows" : macLabel}
             </a>
@@ -78,8 +69,8 @@ export function ConnectorInstallGuide() {
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink-700">
             {platform === "windows"
-              ? "If you use the Windows program, keep the black window open. If Windows warns you, choose More info, then Run anyway."
-              : "If you download a Mac program, do not open it in Terminal. Double-click it in Finder. If macOS blocks it, right-click the file and choose Open."}
+              ? "Open the downloaded file. If Windows warns you, choose More info, then Run anyway. Leave that window open while you work, then return here and click Check if running."
+              : "In Finder, right-click the downloaded file and choose Open. Do not open it in Terminal. Then return here and click Check if running."}
           </p>
           {online === false ? (
             <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
