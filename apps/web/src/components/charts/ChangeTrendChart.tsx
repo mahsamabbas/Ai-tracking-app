@@ -1,27 +1,56 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
-import { AXIS, ChartFrame, GRID, TooltipShell } from "./ChartFrame";
-import { formatDate, formatNumber } from "@/lib/format";
+import { useMemo } from "react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { AXIS, ChartFrame, GRID, TooltipShell, durationTicks } from "./ChartFrame";
+import { formatDate, formatDuration, formatNumber } from "@/lib/format";
 
-/** Daily file creates, edits, and deletes observed from connected agents. */
+type Point = { date: string; fileChanges: number; activeMs?: number };
+
+/** Daily file changes and optional AI active time from the same period. */
 export function ChangeTrendChart({
   data,
+  aiUsageByDay,
   height = 260,
+  fill,
 }: {
   data: { date: string; fileChanges: number }[];
+  aiUsageByDay?: { date: string; activeMs: number }[];
   height?: number;
+  fill?: boolean;
 }) {
-  const hasChanges = data.some((d) => d.fileChanges > 0);
-  const max = Math.max(...data.map((d) => d.fileChanges), 0);
+  const merged = useMemo(() => {
+    const usage = new Map((aiUsageByDay ?? []).map((d) => [d.date, d.activeMs]));
+    return data.map((d) => ({
+      ...d,
+      activeMs: usage.get(d.date) ?? 0,
+    }));
+  }, [data, aiUsageByDay]);
+
+  const hasChanges = merged.some((d) => d.fileChanges > 0);
+  const hasAiUsage = merged.some((d) => (d.activeMs ?? 0) > 0);
+  const hasData = hasChanges || hasAiUsage;
+  const maxChanges = Math.max(...merged.map((d) => d.fileChanges), 0);
+  const maxMs = Math.max(...merged.map((d) => d.activeMs ?? 0), 0);
+  const showAi = Boolean(aiUsageByDay?.length);
+
   return (
     <ChartFrame
       height={height}
-      isEmpty={!hasChanges}
-      emptyTitle="No file changes in this period"
-      emptyBody="Creates, edits, and deletes from Cursor and Claude Code appear here once the connector reports them."
+      fill={fill}
+      isEmpty={!hasData}
+      emptyTitle="No AI usage or file changes in this period"
+      emptyBody="Agent active time and file creates, edits, and deletes appear here once the connector reports them."
     >
-      <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+      <AreaChart data={merged} margin={{ top: 8, right: showAi ? 44 : 8, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="gChanges" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.32} />
@@ -36,36 +65,64 @@ export function ChangeTrendChart({
           minTickGap={24}
         />
         <YAxis
+          yAxisId="files"
           {...AXIS}
           width={36}
           allowDecimals={false}
           tickFormatter={(v: number) => formatNumber(v)}
         />
+        {showAi ? (
+          <YAxis
+            yAxisId="ai"
+            orientation="right"
+            {...AXIS}
+            width={44}
+            allowDecimals={false}
+            tickFormatter={durationTicks(maxMs)}
+          />
+        ) : null}
         <Tooltip
           cursor={{ stroke: "var(--chart-grid)" }}
-          content={({ active, payload, label }) =>
-            active && payload?.length ? (
-              <TooltipShell
-                title={formatDate(String(label))}
-                rows={[
-                  {
-                    label: "File changes",
-                    value: formatNumber(Number(payload[0]?.payload.fileChanges ?? 0)),
-                    color: "var(--chart-2)",
-                  },
-                ]}
-              />
-            ) : null
-          }
+          content={({ active, payload, label }) => {
+            if (!active || !payload?.length) return null;
+            const row = payload[0]?.payload as Point;
+            const rows = [
+              {
+                label: "File changes",
+                value: formatNumber(row.fileChanges ?? 0),
+                color: "var(--chart-2)",
+              },
+            ];
+            if (showAi) {
+              rows.push({
+                label: "AI active time",
+                value: formatDuration(row.activeMs ?? 0),
+                color: "var(--chart-1)",
+              });
+            }
+            return <TooltipShell title={formatDate(String(label))} rows={rows} />;
+          }}
         />
         <Area
+          yAxisId="files"
           type="monotone"
           dataKey="fileChanges"
           stroke="var(--chart-2)"
           strokeWidth={2}
           fill="url(#gChanges)"
-          dot={max > 0 && data.length < 16}
+          dot={maxChanges > 0 && merged.length < 16}
         />
+        {showAi ? (
+          <Line
+            yAxisId="ai"
+            type="monotone"
+            dataKey="activeMs"
+            stroke="var(--chart-1)"
+            strokeWidth={2}
+            dot={maxMs > 0 && merged.length < 16}
+            activeDot={{ r: 4 }}
+          />
+        ) : null}
       </AreaChart>
     </ChartFrame>
   );

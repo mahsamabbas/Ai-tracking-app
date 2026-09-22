@@ -6,6 +6,7 @@ import type { EmptyVariant } from "@/components/ui/States";
 
 export function ChartFrame({
   height = 240,
+  fill,
   isEmpty,
   emptyVariant = "no-activity",
   emptyTitle,
@@ -13,21 +14,30 @@ export function ChartFrame({
   children,
 }: {
   height?: number;
+  /** Grow to fill the parent flex/grid cell (use with a sized parent). */
+  fill?: boolean;
   isEmpty?: boolean;
   emptyVariant?: EmptyVariant;
   emptyTitle?: string;
   emptyBody?: string;
   children: React.ReactElement;
 }) {
+  const emptyMin = fill ? Math.max(height, 220) : height;
   if (isEmpty) {
     return (
-      <div style={{ minHeight: height }} className="flex items-center justify-center">
+      <div
+        style={fill ? { minHeight: emptyMin, height: "100%" } : { minHeight: height }}
+        className="flex w-full items-center justify-center"
+      >
         <EmptyState compact variant={emptyVariant} title={emptyTitle} body={emptyBody} />
       </div>
     );
   }
   return (
-    <div style={{ height }} className="w-full">
+    <div
+      style={fill ? { minHeight: emptyMin, height: "100%" } : { height }}
+      className="w-full"
+    >
       <ResponsiveContainer width="100%" height="100%">
         {children}
       </ResponsiveContainer>

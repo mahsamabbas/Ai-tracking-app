@@ -87,8 +87,6 @@ export interface OrganizationAnalytics {
   toolCategories: { category: string; calls: number }[];
   coverage: CoverageSummary;
   teams: { team: string; activeMs: number; sessions: number; employees: number }[];
-  projects?: { name: string; fileChanges: number; sessions: number }[];
-  changeTrend?: { date: string; fileChanges: number }[];
   scope: "self" | "organization";
 }
 
@@ -205,6 +203,13 @@ export interface EmployeeAnalytics {
   toolCategories: { category: string; calls: number }[];
   models: { model: string; sessions: number }[];
   projects: { projectId: string | null; name: string; activeMs: number; sessions: number }[];
+  fileChangeWorkspaces: {
+    name: string;
+    fileChanges: number;
+    sessions: number;
+    activeMs: number;
+  }[];
+  fileChangeTrend: { date: string; fileChanges: number }[];
   idlePeriods: IdlePeriod[];
   recentSessions: SessionRow[];
   totalSessions: number;

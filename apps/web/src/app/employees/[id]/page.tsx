@@ -25,6 +25,7 @@ import { ConnectorBadge } from "@/components/domain/Badges";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { SessionTable } from "@/components/domain/SessionTable";
 import { ToolCard } from "@/components/domain/ToolCard";
+import { ProjectsFileChangesCard } from "@/components/domain/ProjectsFileChangesCard";
 import { EventTimeline } from "@/components/domain/EventTimeline";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { RangePicker, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
@@ -343,6 +344,24 @@ export default function EmployeeDetailPage() {
                 />
               </CardBody>
             </Card>
+          </section>
+
+          <section className="mt-5">
+            <ProjectsFileChangesCard
+              trend={d.fileChangeTrend ?? []}
+              workspaces={d.fileChangeWorkspaces ?? []}
+              dailyUsage={d.dailyTrend}
+              totals={{
+                activeMs: t.activeMs,
+                sessions: t.sessions,
+                fileChanges: t.fileChanges,
+              }}
+              subtitle={
+                isSelf
+                  ? "Your AI active time, workspaces your agent edited, and file changes from your connector. Session time is counted per workspace when that folder had file activity."
+                  : "This employee's AI active time, edited workspaces, and file changes from their connector. Session time is counted per workspace when that folder had file activity."
+              }
+            />
           </section>
 
           {/* ---------------- AI tools ---------------- */}

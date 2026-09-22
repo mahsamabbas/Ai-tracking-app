@@ -14,7 +14,6 @@ import {
   StatSkeleton,
 } from "@/components/ui/States";
 import { TrendChart } from "@/components/charts/TrendChart";
-import { ChangeTrendChart } from "@/components/charts/ChangeTrendChart";
 import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
@@ -444,35 +443,6 @@ export default function OverviewPage() {
                   ))}
                 </dl>
               </CardBody>
-            </Card>
-          </section>
-
-          <section className="mt-5">
-            <Card>
-              <CardHeader
-                title="Projects and file changes"
-                subtitle="Workspaces the agent edited, and how many file changes were observed each day. This is not a git commit history."
-              />
-              <div className="grid gap-0 xl:grid-cols-3">
-                <CardBody className="pt-2 xl:col-span-2">
-                  <ChangeTrendChart data={d!.changeTrend ?? []} />
-                </CardBody>
-                <div className="border-t border-line xl:border-l xl:border-t-0">
-                  <CardBody>
-                    <p className="label mb-3">Workspaces</p>
-                    <BarList
-                      emptyLabel="No workspace file changes in this period"
-                      items={(d!.projects ?? []).map((p) => ({
-                        label: p.name,
-                        value: p.fileChanges,
-                        formatted: formatNumber(p.fileChanges),
-                        meta: `${p.sessions} session${p.sessions === 1 ? "" : "s"}`,
-                        color: "var(--chart-2)",
-                      }))}
-                    />
-                  </CardBody>
-                </div>
-              </div>
             </Card>
           </section>
 

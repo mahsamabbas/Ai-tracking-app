@@ -35,6 +35,8 @@ import {
   toolDistribution,
   workItems,
   weekdayPattern,
+  workspaceFileChanges,
+  fileChangeTrend,
   type AuthUser,
   type DateRange,
 } from "@techlio/server-core";
@@ -195,6 +197,8 @@ export class AnalyticsController {
       devices,
       gaps,
       recent,
+      fileChangeWorkspaces,
+      fileChangeTrendSeries,
     ] = await Promise.all([
       activityTotals(scope, range),
       activityTotals(scope, prev),
@@ -215,6 +219,8 @@ export class AnalyticsController {
         to: range.to,
         limit: 8,
       }),
+      workspaceFileChanges(scope, range),
+      fileChangeTrend(scope, range),
     ]);
 
     return {
@@ -232,6 +238,8 @@ export class AnalyticsController {
       toolCategories: categories,
       models,
       projects: projectUsage,
+      fileChangeWorkspaces,
+      fileChangeTrend: fileChangeTrendSeries,
       idlePeriods: gaps,
       recentSessions: recent.sessions,
       totalSessions: recent.total,

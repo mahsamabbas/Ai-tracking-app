@@ -778,10 +778,6 @@ export interface OrganizationAnalytics {
   toolCategories: ToolCategorySlice[];
   coverage: CoverageSummary;
   teams: { team: string; activeMs: number; sessions: number; employees: number }[];
-  /** Workspaces observed from allowlisted path categories, with file-change counts. */
-  projects: { name: string; fileChanges: number; sessions: number }[];
-  /** Daily file creates, edits, and deletes. Not a git commit history. */
-  changeTrend: { date: string; fileChanges: number }[];
 }
 
 export async function organizationAnalytics(input: {
@@ -811,8 +807,6 @@ export async function organizationAnalytics(input: {
     coverage,
     headcountRes,
     teamRes,
-    projects,
-    changeTrend,
   ] = await Promise.all([
     activityTotals(scope, input.range),
     activityTotals(scope, prev),
@@ -843,8 +837,6 @@ export async function organizationAnalytics(input: {
       GROUP BY COALESCE(e.team, 'Unassigned')
       ORDER BY active_ms DESC
     `),
-    workspaceFileChanges(scope, input.range),
-    fileChangeTrend(scope, input.range),
   ]);
 
   return {
@@ -863,8 +855,6 @@ export async function organizationAnalytics(input: {
     classifications: classes,
     toolCategories: categories,
     coverage,
-    projects,
-    changeTrend,
     teams: teamRes.rows.map((r) => ({
       team: r.team,
       activeMs: Number(r.active_ms ?? 0),
@@ -1085,18 +1075,28 @@ function eventScope(f: ScopeFilters, range: DateRange) {
 export async function workspaceFileChanges(
   f: ScopeFilters,
   range: DateRange,
-): Promise<{ name: string; fileChanges: number; sessions: number }[]> {
+): Promise<{ name: string; fileChanges: number; sessions: number; activeMs: number }[]> {
   const res = await db.execute<{
     name: string;
     file_changes: number;
     sessions: number;
+    active_ms: string;
   }>(sql`
-    SELECT COALESCE(NULLIF(e.payload->'metadata'->>'path_category', ''), 'Unassigned workspace') AS name,
-           COUNT(*)::int AS file_changes,
-           COUNT(DISTINCT e.session_id)::int AS sessions
-    FROM activity_events e
-    WHERE ${eventScope(f, range)}
-    GROUP BY 1
+    WITH hits AS (
+      SELECT COALESCE(NULLIF(e.payload->'metadata'->>'path_category', ''), 'Unassigned workspace') AS name,
+             e.session_id,
+             COUNT(*)::int AS file_changes
+      FROM activity_events e
+      WHERE ${eventScope(f, range)}
+      GROUP BY 1, 2
+    )
+    SELECT h.name,
+           SUM(h.file_changes)::int AS file_changes,
+           COUNT(DISTINCT h.session_id)::int AS sessions,
+           COALESCE(SUM(s.active_duration_ms), 0) AS active_ms
+    FROM hits h
+    JOIN agent_sessions s ON s.id = h.session_id
+    GROUP BY h.name
     ORDER BY file_changes DESC
     LIMIT 12
   `);
@@ -1104,6 +1104,7 @@ export async function workspaceFileChanges(
     name: r.name,
     fileChanges: r.file_changes,
     sessions: r.sessions,
+    activeMs: Number(r.active_ms ?? 0),
   }));
 }
 
